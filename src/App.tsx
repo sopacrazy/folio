@@ -23,6 +23,7 @@ import ProjectFormPage from './pages/ProjectFormPage';
 import LoginPage from './pages/LoginPage';
 import SettingsLayout from './pages/settings/SettingsLayout';
 import SettingsProfilePage from './pages/settings/SettingsProfilePage';
+import SettingsAccountPage from './pages/settings/SettingsAccountPage';
 import SettingsPlaceholderPage from './pages/settings/SettingsPlaceholderPage';
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -190,7 +191,7 @@ export default function App() {
           <Route path="/configuracoes" element={<SettingsLayout />}>
             <Route index element={<Navigate to="/configuracoes/perfil" replace />} />
             <Route path="perfil" element={<SettingsProfilePage />} />
-            <Route path="conta" element={<SettingsPlaceholderPage title="Conta" />} />
+            <Route path="conta" element={<SettingsAccountPage />} />
             <Route path="notificacoes" element={<SettingsPlaceholderPage title="Notificações" />} />
             <Route path="privacidade" element={<SettingsPlaceholderPage title="Privacidade" />} />
           </Route>

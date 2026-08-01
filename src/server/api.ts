@@ -2,9 +2,12 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
+import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { DeleteCommand, GetCommand, PutCommand, QueryCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { ddb, TABLES } from './dynamo.ts';
+import { s3, S3_BUCKET, s3PublicUrl } from './s3.ts';
 
 // Backend 100% DynamoDB agora — auth, usuários e projetos migrados. O antigo
 // schema Drizzle/SQLite (src/db/) não é mais usado por este arquivo.
@@ -38,14 +41,8 @@ const optionalAuthenticate = (req: any, _res: any, next: any) => {
   next();
 };
 
-// Configuração do Multer para upload local
-const storage = multer.diskStorage({
-  destination: 'uploads/',
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
-  }
-});
-const upload = multer({ storage });
+// Multer guarda o arquivo em memória (buffer) — vai direto pro S3, nunca toca o disco.
+const upload = multer({ storage: multer.memoryStorage() });
 
 // -- HELPERS COMPARTILHADOS (DynamoDB) --
 
@@ -342,6 +339,97 @@ router.put('/users/me', authenticate, async (req: any, res) => {
     // Reemite o token porque o username (parte do payload do JWT) pode ter mudado.
     const token = jwt.sign({ id: updated.id, username: updated.username }, JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, user: toPrivateUser(updated) });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Exclusão de conta — irreversível. Limpa tudo que referencia o usuário antes de
+// apagar o registro em si, pra não deixar sobras órfãs em outras tabelas
+// (curtidas, follows nos dois sentidos, badges, projetos e as curtidas neles).
+router.delete('/users/me', authenticate, async (req: any, res) => {
+  try {
+    const userId = req.user.id;
+
+    const [badgeLinks, following, followers, likesMade, projects] = await Promise.all([
+      ddb.send(new QueryCommand({
+        TableName: TABLES.userBadges,
+        KeyConditionExpression: 'userId = :v',
+        ExpressionAttributeValues: { ':v': userId },
+      })),
+      ddb.send(new QueryCommand({
+        TableName: TABLES.follows,
+        KeyConditionExpression: 'followerId = :v',
+        ExpressionAttributeValues: { ':v': userId },
+      })),
+      ddb.send(new QueryCommand({
+        TableName: TABLES.follows,
+        IndexName: 'followingId-index',
+        KeyConditionExpression: 'followingId = :v',
+        ExpressionAttributeValues: { ':v': userId },
+      })),
+      ddb.send(new QueryCommand({
+        TableName: TABLES.likes,
+        KeyConditionExpression: 'userId = :v',
+        ExpressionAttributeValues: { ':v': userId },
+      })),
+      getProjectsByOwnerId(userId),
+    ]);
+
+    // Curtidas em projetos de outras pessoas: dá pra decrementar o likeCount.
+    // Curtidas nos próprios projetos não — esses projetos já vão ser apagados
+    // por inteiro, e decrementar em paralelo a isso recriaria o item (o Update
+    // do DynamoDB faz upsert, então "reviveria" um projeto que a mesma leva de
+    // operações está deletando ao mesmo tempo).
+    const ownProjectIds = new Set(projects.map((p) => p.id));
+    const likesToDecrement = (likesMade.Items ?? []).filter((l: any) => !ownProjectIds.has(l.projectId));
+    const followingIds = (following.Items ?? []).map((f: any) => f.followingId);
+
+    await Promise.all([
+      ...(badgeLinks.Items ?? []).map((b: any) =>
+        ddb.send(new DeleteCommand({ TableName: TABLES.userBadges, Key: { userId: b.userId, badgeId: b.badgeId } }))
+      ),
+      ...(following.Items ?? []).map((f: any) =>
+        ddb.send(new DeleteCommand({ TableName: TABLES.follows, Key: { followerId: f.followerId, followingId: f.followingId } }))
+      ),
+      ...followingIds.map((followingId: string) =>
+        ddb.send(new UpdateCommand({
+          TableName: TABLES.users,
+          Key: { id: followingId },
+          UpdateExpression: 'ADD followers :dec',
+          ExpressionAttributeValues: { ':dec': -1 },
+        }))
+      ),
+      ...(followers.Items ?? []).map((f: any) =>
+        ddb.send(new DeleteCommand({ TableName: TABLES.follows, Key: { followerId: f.followerId, followingId: f.followingId } }))
+      ),
+      ...(likesMade.Items ?? []).map((l: any) =>
+        ddb.send(new DeleteCommand({ TableName: TABLES.likes, Key: { userId: l.userId, projectId: l.projectId } }))
+      ),
+      ...likesToDecrement.map((l: any) =>
+        ddb.send(new UpdateCommand({
+          TableName: TABLES.projects,
+          Key: { id: l.projectId },
+          UpdateExpression: 'ADD likeCount :dec',
+          ExpressionAttributeValues: { ':dec': -1 },
+        }))
+      ),
+      ...projects.map(async (p) => {
+        const projectLikes = await ddb.send(new QueryCommand({
+          TableName: TABLES.likes,
+          IndexName: 'projectId-index',
+          KeyConditionExpression: 'projectId = :v',
+          ExpressionAttributeValues: { ':v': p.id },
+        }));
+        await Promise.all((projectLikes.Items ?? []).map((l: any) =>
+          ddb.send(new DeleteCommand({ TableName: TABLES.likes, Key: { userId: l.userId, projectId: l.projectId } }))
+        ));
+        await ddb.send(new DeleteCommand({ TableName: TABLES.projects, Key: { id: p.id } }));
+      }),
+    ]);
+
+    await ddb.send(new DeleteCommand({ TableName: TABLES.users, Key: { id: userId } }));
+    res.json({ ok: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -674,9 +762,28 @@ router.delete('/projects/:id/like', authenticate, async (req: any, res) => {
 });
 
 // -- UPLOAD --
-router.post('/upload', authenticate, upload.single('file'), (req, res) => {
+
+// Nome do objeto: uuid + extensão original — evita colisão e não expõe o nome
+// de arquivo que o usuário mandou. `folder` vem do form-data do cliente, mas
+// é validado contra uma lista fixa antes de virar parte da key do S3.
+router.post('/upload', authenticate, upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-  res.json({ url: `/uploads/${req.file.filename}` });
+  try {
+    const folder = req.body.folder === 'avatars' ? 'avatars' : 'projects';
+    const ext = path.extname(req.file.originalname);
+    const key = `${folder}/${uuidv4()}${ext}`;
+
+    await s3.send(new PutObjectCommand({
+      Bucket: S3_BUCKET,
+      Key: key,
+      Body: req.file.buffer,
+      ContentType: req.file.mimetype,
+    }));
+
+    res.json({ url: s3PublicUrl(key) });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 export { router as apiRouter };

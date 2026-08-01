@@ -1,7 +1,10 @@
-/** Envia um arquivo pro backend (POST /api/upload) e devolve a URL pública salva no disco do servidor. */
-export async function uploadFile(file: File, token: string | null): Promise<string> {
+export type UploadFolder = 'avatars' | 'projects';
+
+/** Envia um arquivo pro backend (POST /api/upload), que repassa pro S3, e devolve a URL pública. */
+export async function uploadFile(file: File, token: string | null, folder: UploadFolder): Promise<string> {
   const formData = new FormData();
   formData.append('file', file);
+  formData.append('folder', folder);
 
   const res = await fetch('/api/upload', {
     method: 'POST',

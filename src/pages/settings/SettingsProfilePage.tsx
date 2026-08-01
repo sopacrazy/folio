@@ -96,7 +96,7 @@ export default function SettingsProfilePage() {
     e.target.value = '';
     if (!file || !validateFile(file)) return;
     try {
-      const url = await uploadFile(file, token);
+      const url = await uploadFile(file, token, 'avatars');
       setForm((f) => ({ ...f, coverUrl: url }));
     } catch (err: any) {
       setFileError(err.message || 'Falha ao enviar a imagem.');
@@ -108,7 +108,7 @@ export default function SettingsProfilePage() {
     e.target.value = '';
     if (!file || !validateFile(file)) return;
     try {
-      const url = await uploadFile(file, token);
+      const url = await uploadFile(file, token, 'avatars');
       setForm((f) => ({ ...f, avatarUrl: url }));
     } catch (err: any) {
       setFileError(err.message || 'Falha ao enviar a imagem.');

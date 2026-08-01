@@ -122,7 +122,7 @@ export default function ProjectFormPage() {
   const handleCoverFile = async (file: File) => {
     if (!validateFile(file)) return;
     try {
-      const url = await uploadFile(file, token);
+      const url = await uploadFile(file, token, 'projects');
       setCoverImageUrl(url);
     } catch (err: any) {
       setFileError(err.message || 'Falha ao enviar a imagem.');
@@ -143,12 +143,14 @@ export default function ProjectFormPage() {
   };
 
   const onGalleryInputChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
+    // `e.target.files` é uma FileList viva — precisa virar um array de verdade
+    // antes de zerar `value`, senão a limpeza do input esvazia a lista junto.
+    const files = e.target.files ? Array.from(e.target.files) : [];
     e.target.value = '';
-    if (!files) return;
-    const validFiles = Array.from(files).filter(validateFile);
+    if (files.length === 0) return;
+    const validFiles = files.filter(validateFile);
     try {
-      const urls = await Promise.all(validFiles.map((file) => uploadFile(file, token)));
+      const urls = await Promise.all(validFiles.map((file) => uploadFile(file, token, 'projects')));
       setGallery((g) => [...g, ...urls]);
     } catch (err: any) {
       setFileError(err.message || 'Falha ao enviar as imagens.');
