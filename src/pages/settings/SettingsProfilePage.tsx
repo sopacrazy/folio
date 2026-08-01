@@ -91,13 +91,39 @@ export default function SettingsProfilePage() {
     return true;
   };
 
+  /** Salva um snapshot do formulário de verdade no backend (usado pelo submit e pelo autosave de foto). */
+  const saveProfile = async (data: ProfileFormData) => {
+    const res = await fetch('/api/users/me', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Não foi possível salvar as alterações.');
+
+    // Reemitido porque o username (parte do token) pode ter mudado — atualiza
+    // token + usuário no header/menu junto.
+    login(body.token, body.user);
+  };
+
+  // Foto de capa/avatar salva sozinha assim que o upload termina — não fica
+  // presa ao restante do formulário. Antes disso, trocar a foto só mudava a
+  // prévia local: se o usuário recarregasse a página sem clicar em "Salvar
+  // alterações", a imagem voltava pra antiga (parecia que a troca não tinha
+  // funcionado).
   const onCoverChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file || !validateFile(file)) return;
     try {
       const url = await uploadFile(file, token, 'avatars');
-      setForm((f) => ({ ...f, coverUrl: url }));
+      const next = { ...form, coverUrl: url };
+      setForm(next);
+      await saveProfile(next);
+      setFeedback({ type: 'success', message: 'Capa atualizada.' });
     } catch (err: any) {
       setFileError(err.message || 'Falha ao enviar a imagem.');
     }
@@ -109,7 +135,10 @@ export default function SettingsProfilePage() {
     if (!file || !validateFile(file)) return;
     try {
       const url = await uploadFile(file, token, 'avatars');
-      setForm((f) => ({ ...f, avatarUrl: url }));
+      const next = { ...form, avatarUrl: url };
+      setForm(next);
+      await saveProfile(next);
+      setFeedback({ type: 'success', message: 'Foto de perfil atualizada.' });
     } catch (err: any) {
       setFileError(err.message || 'Falha ao enviar a imagem.');
     }
@@ -120,20 +149,7 @@ export default function SettingsProfilePage() {
     setSaving(true);
     setFeedback(null);
     try {
-      const res = await fetch('/api/users/me', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Não foi possível salvar as alterações.');
-
-      // Reemitido porque o username (parte do token) pode ter mudado — atualiza
-      // token + usuário no header/menu junto.
-      login(data.token, data.user);
+      await saveProfile(form);
       setFeedback({ type: 'success', message: 'Perfil atualizado com sucesso.' });
     } catch (err: any) {
       setFeedback({ type: 'error', message: err.message || 'Não foi possível salvar as alterações.' });

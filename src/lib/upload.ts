@@ -12,7 +12,15 @@ export async function uploadFile(file: File, token: string | null, folder: Uploa
     body: formData,
   });
 
+  // Respostas de erro nem sempre são JSON — um proxy na frente do servidor
+  // (nginx, por exemplo) pode responder com uma página HTML antes mesmo do
+  // Express ver a requisição (ex: 413 por limite de tamanho do corpo).
+  if (!res.ok) {
+    if (res.status === 413) throw new Error('Arquivo grande demais para o servidor aceitar.');
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error || `Falha ao enviar o arquivo (HTTP ${res.status}).`);
+  }
+
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Falha ao enviar o arquivo.');
   return data.url as string;
 }
