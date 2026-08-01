@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
+import CreatorCard from '../components/CreatorCard';
 import ProjectCard from '../components/ProjectCard';
-import { getProjects } from '../mockData';
+import { fetchCreators } from '../lib/creators';
+import { fetchProjectFeed } from '../lib/projects';
+import { useAuthStore } from '../store/auth';
 import { cn } from '@/lib/utils';
 
 export default function DiscoverPage() {
+  const { token } = useAuthStore();
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const categories = ['Todos', 'UI/UX', 'Ilustração', 'Dev', 'Fotografia', '3D', 'Branding'];
@@ -12,14 +16,49 @@ export default function DiscoverPage() {
   const [searchParams] = useSearchParams();
   const query = searchParams.get('q')?.trim().toLowerCase() ?? '';
 
+  const [creatorMatches, setCreatorMatches] = useState<any[]>([]);
+  const [creatorsLoading, setCreatorsLoading] = useState(false);
+
   useEffect(() => {
-    setProjects(getProjects());
-    setLoading(false);
-  }, []);
+    let cancelled = false;
+    fetchProjectFeed(token).then((all) => {
+      if (!cancelled) {
+        setProjects(all);
+        setLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  // Busca criadores só quando há uma query digitada — a listagem "Todos" já
+  // tem página própria em /criadores, não precisa duplicar aqui.
+  useEffect(() => {
+    if (!query) {
+      setCreatorMatches([]);
+      return;
+    }
+    let cancelled = false;
+    setCreatorsLoading(true);
+    fetchCreators(query).then((matches) => {
+      if (!cancelled) {
+        setCreatorMatches(matches);
+        setCreatorsLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [query]);
 
   const filteredProjects = projects.filter((p: any) => {
     const matchesCategory = activeCategory === 'Todos' || p.tags?.includes(activeCategory);
-    const matchesQuery = !query || p.title.toLowerCase().includes(query) || p.user?.fullName?.toLowerCase().includes(query);
+    const matchesQuery =
+      !query ||
+      p.title.toLowerCase().includes(query) ||
+      p.user?.fullName?.toLowerCase().includes(query) ||
+      p.user?.username?.toLowerCase().includes(query);
     return matchesCategory && matchesQuery;
   });
 
@@ -55,6 +94,31 @@ export default function DiscoverPage() {
           </p>
         )}
 
+        {/* Criadores que batem com a busca */}
+        {query && !creatorsLoading && creatorMatches.length > 0 && (
+          <section className="mb-10">
+            <h2 className="text-lg font-bold text-foreground mb-4">Criadores</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {creatorMatches.map((creator) => (
+                <CreatorCard
+                  key={creator.id}
+                  name={creator.fullName}
+                  handle={creator.username}
+                  followers={creator.followers}
+                  avatarUrl={creator.avatarUrl}
+                  coverUrl={creator.coverUrl}
+                  tags={creator.skills}
+                  bio={creator.bio}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {query && creatorMatches.length > 0 && filteredProjects.length > 0 && (
+          <h2 className="text-lg font-bold text-foreground mb-4">Projetos</h2>
+        )}
+
         {loading ? (
           <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-6">
             {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -75,9 +139,9 @@ export default function DiscoverPage() {
           </div>
         )}
 
-        {!loading && filteredProjects.length === 0 && (
+        {!loading && !creatorsLoading && filteredProjects.length === 0 && creatorMatches.length === 0 && (
           <div className="text-center py-20 text-muted-foreground">
-            <p className="text-lg">Nenhum projeto encontrado.</p>
+            <p className="text-lg">Nenhum resultado encontrado.</p>
           </div>
         )}
       </div>

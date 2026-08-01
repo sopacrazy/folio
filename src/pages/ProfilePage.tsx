@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router';
+import { useParams, Link, useNavigate } from 'react-router';
 import ProjectCard from '../components/ProjectCard';
 import BadgeIcon from '../components/BadgeIcon';
 import EmptyState from '../components/EmptyState';
@@ -16,12 +16,92 @@ export default function ProfilePage() {
   const username = handle?.startsWith('@') ? handle.slice(1) : handle;
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const { user: currentUser } = useAuthStore();
+  const { user: currentUser, token } = useAuthStore();
+  const navigate = useNavigate();
+
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followLoading, setFollowLoading] = useState(false);
 
   useEffect(() => {
-    setUser(username ? getUserByUsername(username) : null);
-    setLoading(false);
-  }, [username]);
+    let cancelled = false;
+
+    async function load() {
+      if (!username) {
+        if (!cancelled) setUser(null);
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/users/${encodeURIComponent(username)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled) {
+            const projects = (data.projects ?? []).map((p: any) => ({ ...p, source: 'real' as const }));
+            setUser({ ...data, source: 'real', projects });
+            setIsFollowing(Boolean(data.isFollowingByMe));
+            setFollowerCount(data.followers ?? 0);
+          }
+          return;
+        }
+      } catch {
+        // API indisponível — cai pro fallback abaixo.
+      }
+
+      // Os usuários de demonstração (Ana, João, Mel...) ainda só existem nos
+      // dados mock, não no DynamoDB — fallback pra manter a navegação funcionando.
+      const mockUser = getUserByUsername(username);
+      if (!cancelled) {
+        if (mockUser) {
+          const projects = (mockUser.projects ?? []).map((p: any) => ({ ...p, source: 'mock' as const }));
+          setUser({ ...mockUser, source: 'mock', projects });
+        } else {
+          setUser(null);
+        }
+        setIsFollowing(false);
+        setFollowerCount(mockUser?.followers ?? 0);
+      }
+    }
+
+    setLoading(true);
+    load().finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [username, token]);
+
+  const handleFollowToggle = async () => {
+    if (!username || user?.source !== 'real') return;
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+
+    setFollowLoading(true);
+    const next = !isFollowing;
+    setIsFollowing(next);
+    setFollowerCount((c) => c + (next ? 1 : -1));
+    try {
+      const res = await fetch(`/api/users/${encodeURIComponent(username)}/follow`, {
+        method: next ? 'POST' : 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Não foi possível atualizar o seguir.');
+      setIsFollowing(data.following);
+      setFollowerCount(data.followers);
+    } catch {
+      setIsFollowing(!next);
+      setFollowerCount((c) => c + (next ? -1 : 1));
+    } finally {
+      setFollowLoading(false);
+    }
+  };
 
   if (loading) {
     return <div className="min-h-[50vh] flex items-center justify-center text-muted-foreground">Carregando...</div>;
@@ -69,7 +149,7 @@ export default function ProfilePage() {
                 )}
               </div>
               <p className="text-muted-foreground font-medium">
-                @{user.username} · {(user.followers ?? 0).toLocaleString('pt-BR')} seguidores
+                @{user.username} · {followerCount.toLocaleString('pt-BR')} seguidores
               </p>
             </div>
           </div>
@@ -83,8 +163,12 @@ export default function ProfilePage() {
               </Button>
             ) : (
               <>
-                <Button>
-                  <UserPlus className="w-4 h-4" /> Seguir
+                <Button
+                  variant={isFollowing ? 'outline' : 'default'}
+                  onClick={handleFollowToggle}
+                  disabled={user.source !== 'real' || followLoading}
+                >
+                  <UserPlus className="w-4 h-4" /> {isFollowing ? 'Seguindo' : 'Seguir'}
                 </Button>
                 <Button variant="outline" size="icon">
                   <MoreHorizontal className="w-4 h-4" />

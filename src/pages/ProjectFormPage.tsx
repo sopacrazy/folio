@@ -2,12 +2,8 @@ import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type For
 import { useNavigate, useParams } from 'react-router';
 import { Plus, UploadCloud, X } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
-import {
-  createMockProject,
-  getProjectByUsernameAndSlug,
-  slugify,
-  updateMockProject,
-} from '../mockData';
+import { slugify } from '../mockData';
+import { uploadFile } from '../lib/upload';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -22,7 +18,7 @@ export default function ProjectFormPage() {
   const { handle, slug: editingSlug } = useParams();
   const isEditMode = Boolean(editingSlug);
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, token } = useAuthStore();
 
   const [projectId, setProjectId] = useState<string | null>(null);
   const [wasPublished, setWasPublished] = useState(false);
@@ -52,25 +48,47 @@ export default function ProjectFormPage() {
 
   useEffect(() => {
     if (!isEditMode || !user) return;
+    let cancelled = false;
     const username = handle?.startsWith('@') ? handle.slice(1) : handle;
-    const existing = username && editingSlug ? getProjectByUsernameAndSlug(username, editingSlug) : null;
 
-    if (!existing || existing.ownerId !== user.id) {
-      setNotFound(true);
-      setLoading(false);
-      return;
+    async function load() {
+      if (!username || !editingSlug) {
+        if (!cancelled) { setNotFound(true); setLoading(false); }
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/projects/${encodeURIComponent(username)}/${encodeURIComponent(editingSlug)}`);
+        if (res.ok) {
+          const existing = await res.json();
+          if (existing.ownerId !== user!.id) {
+            if (!cancelled) { setNotFound(true); setLoading(false); }
+            return;
+          }
+          if (!cancelled) {
+            setProjectId(existing.id);
+            setTitle(existing.title);
+            setSlugValue(existing.slug);
+            setDescription(existing.description ?? '');
+            setTags(existing.tags ?? []);
+            setCoverImageUrl(existing.coverImageUrl);
+            setGallery(existing.gallery ?? []);
+            setIsPublic(existing.isPublic);
+            setWasPublished(existing.isPublic);
+            setLoading(false);
+          }
+          return;
+        }
+      } catch {
+        // segue pro "não encontrado" abaixo
+      }
+      if (!cancelled) { setNotFound(true); setLoading(false); }
     }
 
-    setProjectId(existing.id);
-    setTitle(existing.title);
-    setSlugValue(existing.slug);
-    setDescription(existing.description ?? '');
-    setTags(existing.tags ?? []);
-    setCoverImageUrl(existing.coverImageUrl);
-    setGallery(existing.gallery ?? []);
-    setIsPublic(existing.isPublic);
-    setWasPublished(existing.isPublic);
-    setLoading(false);
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, [isEditMode, handle, editingSlug, user]);
 
   if (!user) return null;
@@ -101,8 +119,14 @@ export default function ProjectFormPage() {
     return true;
   };
 
-  const handleCoverFile = (file: File) => {
-    if (validateFile(file)) setCoverImageUrl(URL.createObjectURL(file));
+  const handleCoverFile = async (file: File) => {
+    if (!validateFile(file)) return;
+    try {
+      const url = await uploadFile(file, token);
+      setCoverImageUrl(url);
+    } catch (err: any) {
+      setFileError(err.message || 'Falha ao enviar a imagem.');
+    }
   };
 
   const onCoverInputChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -118,16 +142,17 @@ export default function ProjectFormPage() {
     if (file) handleCoverFile(file);
   };
 
-  const onGalleryInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const onGalleryInputChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files) {
-      const validUrls: string[] = [];
-      for (let i = 0; i < files.length; i++) {
-        if (validateFile(files[i])) validUrls.push(URL.createObjectURL(files[i]));
-      }
-      setGallery((g) => [...g, ...validUrls]);
-    }
     e.target.value = '';
+    if (!files) return;
+    const validFiles = Array.from(files).filter(validateFile);
+    try {
+      const urls = await Promise.all(validFiles.map((file) => uploadFile(file, token)));
+      setGallery((g) => [...g, ...urls]);
+    } catch (err: any) {
+      setFileError(err.message || 'Falha ao enviar as imagens.');
+    }
   };
 
   const addTag = () => {
@@ -171,9 +196,16 @@ export default function ProjectFormPage() {
         isPublic: nextIsPublic,
       };
 
-      const result = projectId
-        ? updateMockProject(projectId, user.id, payload)
-        : createMockProject(user.id, payload);
+      const res = await fetch(projectId ? `/api/projects/${projectId}` : '/api/projects', {
+        method: projectId ? 'PUT' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Não foi possível salvar o projeto.');
 
       navigate(`/@${user.username}/${result.slug}`);
     } catch (err: any) {

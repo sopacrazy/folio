@@ -1,35 +1,109 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router';
+import { useParams, Link, useNavigate } from 'react-router';
 import { ArrowRight, Check, Copy, Eye, Heart, Pencil } from 'lucide-react';
 import { getProjectByUsernameAndSlug, incrementProjectViewCount } from '../mockData';
 import { useAuthStore } from '../store/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 export default function ProjectPage() {
   const { handle, slug } = useParams();
   const username = handle?.startsWith('@') ? handle.slice(1) : handle;
+  const { user: currentUser, token } = useAuthStore();
   const navigate = useNavigate();
-  const { user: currentUser } = useAuthStore();
 
   const [project, setProject] = useState<any>(null);
+  const [source, setSource] = useState<'real' | 'mock' | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
   const viewCounted = useRef(false);
 
   useEffect(() => {
-    const found = username && slug ? getProjectByUsernameAndSlug(username, slug) : null;
-    setProject(found);
-    setLoading(false);
-  }, [username, slug]);
+    let cancelled = false;
+
+    async function load() {
+      if (!username || !slug) {
+        if (!cancelled) { setProject(null); setLoading(false); }
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/projects/${encodeURIComponent(username)}/${encodeURIComponent(slug)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled) {
+            setProject(data);
+            setSource('real');
+            setLiked(Boolean(data.likedByMe));
+            setLikeCount(data.likeCount || 0);
+            setLoading(false);
+          }
+          return;
+        }
+      } catch {
+        // API indisponível — cai pro fallback mock abaixo.
+      }
+
+      // Projetos de demonstração ainda só existem nos dados mock.
+      const found = getProjectByUsernameAndSlug(username, slug);
+      if (!cancelled) {
+        setProject(found);
+        setSource('mock');
+        setLiked(false);
+        setLikeCount(found?.likeCount || 0);
+        setLoading(false);
+      }
+    }
+
+    setLoading(true);
+    viewCounted.current = false;
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [username, slug, token]);
+
+  const handleLikeToggle = async () => {
+    if (source !== 'real' || !project) return;
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+
+    const next = !liked;
+    setLiked(next);
+    setLikeCount((c) => c + (next ? 1 : -1));
+    try {
+      const res = await fetch(`/api/projects/${project.id}/like`, {
+        method: next ? 'POST' : 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setLiked(data.liked);
+      setLikeCount(data.likeCount);
+    } catch {
+      setLiked(!next);
+      setLikeCount((c) => c + (next ? -1 : 1));
+    }
+  };
 
   useEffect(() => {
-    if (project && !viewCounted.current) {
-      viewCounted.current = true;
+    if (!project || viewCounted.current) return;
+    viewCounted.current = true;
+
+    if (source === 'real') {
+      fetch(`/api/projects/${project.id}/view`, { method: 'POST' }).catch(() => {});
+    } else if (source === 'mock') {
       incrementProjectViewCount(project.id);
     }
-  }, [project]);
+  }, [project, source]);
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Carregando...</div>;
@@ -152,9 +226,18 @@ export default function ProjectPage() {
         {/* Rodapé */}
         <div className="flex items-center justify-between border-t border-border pt-6">
           <div className="flex items-center gap-4 text-muted-foreground text-sm">
-            <span className="flex items-center gap-1.5">
-              <Heart className="w-4 h-4" /> {project.likeCount}
-            </span>
+            <button
+              type="button"
+              onClick={handleLikeToggle}
+              disabled={source !== 'real'}
+              aria-label={liked ? 'Descurtir' : 'Curtir'}
+              className={cn(
+                'flex items-center gap-1.5 transition-colors',
+                source === 'real' ? 'hover:text-red-500 cursor-pointer' : 'cursor-default'
+              )}
+            >
+              <Heart className={cn('w-4 h-4', liked && 'fill-red-500 text-red-500')} /> {likeCount}
+            </button>
             <span className="flex items-center gap-1.5">
               <Eye className="w-4 h-4" /> {project.viewCount.toLocaleString('pt-BR')} visualizações
             </span>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuthStore } from '../../store/auth';
-import { getUserByUsername, updateUserProfile } from '../../mockData';
+import { uploadFile } from '../../lib/upload';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -33,7 +33,7 @@ const emptyForm: ProfileFormData = {
 };
 
 export default function SettingsProfilePage() {
-  const { user: authUser, updateUser } = useAuthStore();
+  const { user: authUser, token, login } = useAuthStore();
   const navigate = useNavigate();
   const [form, setForm] = useState<ProfileFormData>(emptyForm);
   const [loading, setLoading] = useState(true);
@@ -46,19 +46,32 @@ export default function SettingsProfilePage() {
 
   useEffect(() => {
     if (!authUser) return;
-    const fullProfile = getUserByUsername(authUser.username);
-    if (fullProfile) {
-      setForm({
-        fullName: fullProfile.fullName ?? '',
-        username: fullProfile.username ?? '',
-        bio: fullProfile.bio ?? '',
-        avatarUrl: fullProfile.avatarUrl ?? '',
-        coverUrl: fullProfile.coverUrl ?? '',
-        portfolioLink: fullProfile.portfolioLink ?? '',
-        contactEmail: fullProfile.contactEmail ?? '',
-      });
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const res = await fetch(`/api/users/${encodeURIComponent(authUser!.username)}`);
+        const fullProfile = res.ok ? await res.json() : null;
+        if (fullProfile && !cancelled) {
+          setForm({
+            fullName: fullProfile.fullName ?? '',
+            username: fullProfile.username ?? '',
+            bio: fullProfile.bio ?? '',
+            avatarUrl: fullProfile.avatarUrl ?? '',
+            coverUrl: fullProfile.coverUrl ?? '',
+            portfolioLink: fullProfile.portfolioLink ?? '',
+            contactEmail: fullProfile.contactEmail ?? '',
+          });
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
-    setLoading(false);
+
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, [authUser]);
 
   // A rota /configuracoes já é protegida pelo SettingsLayout (pai) — aqui só
@@ -78,20 +91,28 @@ export default function SettingsProfilePage() {
     return true;
   };
 
-  const onCoverChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const onCoverChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && validateFile(file)) {
-      setForm((f) => ({ ...f, coverUrl: URL.createObjectURL(file) }));
-    }
     e.target.value = '';
+    if (!file || !validateFile(file)) return;
+    try {
+      const url = await uploadFile(file, token);
+      setForm((f) => ({ ...f, coverUrl: url }));
+    } catch (err: any) {
+      setFileError(err.message || 'Falha ao enviar a imagem.');
+    }
   };
 
-  const onAvatarChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const onAvatarChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && validateFile(file)) {
-      setForm((f) => ({ ...f, avatarUrl: URL.createObjectURL(file) }));
-    }
     e.target.value = '';
+    if (!file || !validateFile(file)) return;
+    try {
+      const url = await uploadFile(file, token);
+      setForm((f) => ({ ...f, avatarUrl: url }));
+    } catch (err: any) {
+      setFileError(err.message || 'Falha ao enviar a imagem.');
+    }
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -99,8 +120,20 @@ export default function SettingsProfilePage() {
     setSaving(true);
     setFeedback(null);
     try {
-      const updated = updateUserProfile(authUser.id, form);
-      updateUser(updated);
+      const res = await fetch('/api/users/me', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Não foi possível salvar as alterações.');
+
+      // Reemitido porque o username (parte do token) pode ter mudado — atualiza
+      // token + usuário no header/menu junto.
+      login(data.token, data.user);
       setFeedback({ type: 'success', message: 'Perfil atualizado com sucesso.' });
     } catch (err: any) {
       setFeedback({ type: 'error', message: err.message || 'Não foi possível salvar as alterações.' });

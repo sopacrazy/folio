@@ -1,8 +1,11 @@
-import { Link } from 'react-router';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router';
 import { Heart, MessageCircle } from 'lucide-react';
+import { useAuthStore } from '../store/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 interface ProjectCardProps {
   project: any;
@@ -11,6 +14,44 @@ interface ProjectCardProps {
 
 export default function ProjectCard({ project }: ProjectCardProps) {
   const href = `/@${project.user?.username}/${project.slug}`;
+  const isReal = project.source !== 'mock';
+  const { token } = useAuthStore();
+  const navigate = useNavigate();
+
+  const [liked, setLiked] = useState(Boolean(project.likedByMe));
+  const [likeCount, setLikeCount] = useState(project.likeCount || 0);
+
+  useEffect(() => {
+    setLiked(Boolean(project.likedByMe));
+    setLikeCount(project.likeCount || 0);
+  }, [project.id, project.likedByMe, project.likeCount]);
+
+  const handleLikeToggle = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isReal) return;
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+
+    const next = !liked;
+    setLiked(next);
+    setLikeCount((c: number) => c + (next ? 1 : -1));
+    try {
+      const res = await fetch(`/api/projects/${project.id}/like`, {
+        method: next ? 'POST' : 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setLiked(data.liked);
+      setLikeCount(data.likeCount);
+    } catch {
+      setLiked(!next);
+      setLikeCount((c: number) => c + (next ? -1 : 1));
+    }
+  };
 
   return (
     <Card className="group relative overflow-hidden hover:shadow-md transition-shadow duration-300 p-0">
@@ -49,9 +90,18 @@ export default function ProjectCard({ project }: ProjectCardProps) {
           </Link>
 
           <div className="flex items-center gap-3 text-muted-foreground shrink-0">
-            <span className="flex items-center gap-1 text-xs">
-              <Heart className="w-3.5 h-3.5" /> {project.likeCount || 0}
-            </span>
+            <button
+              type="button"
+              onClick={handleLikeToggle}
+              disabled={!isReal}
+              aria-label={liked ? 'Descurtir' : 'Curtir'}
+              className={cn(
+                'flex items-center gap-1 text-xs transition-colors',
+                isReal ? 'hover:text-red-500 cursor-pointer' : 'cursor-default'
+              )}
+            >
+              <Heart className={cn('w-3.5 h-3.5', liked && 'fill-red-500 text-red-500')} /> {likeCount}
+            </button>
             <span className="flex items-center gap-1 text-xs">
               <MessageCircle className="w-3.5 h-3.5" /> {project.commentCount || 0}
             </span>

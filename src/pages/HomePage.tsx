@@ -1,10 +1,13 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { ArrowRight, Briefcase, Coffee, Heart, Sparkles, Sprout } from 'lucide-react';
+import { ArrowRight, Briefcase, Coffee, Heart, Sparkles, Sprout, UserPlus, Users } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
-import { getCreators, getLatestProjects } from '../mockData';
+import { getCreators } from '../mockData';
+import { fetchProjectFeed } from '../lib/projects';
 import { Button } from '@/components/ui/button';
 import CreatorCard from '../components/CreatorCard';
 import ProjectCard from '../components/ProjectCard';
+import EmptyState from '../components/EmptyState';
 
 function HeroIllustration() {
   return (
@@ -41,13 +44,22 @@ function HeroIllustration() {
   );
 }
 
-export default function HomePage() {
-  const { user } = useAuthStore();
+function DiscoveryHome({ token }: { token: string | null }) {
   const creators = getCreators();
-  const latestProjects = getLatestProjects(6);
+  const [latestProjects, setLatestProjects] = useState<any[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchProjectFeed(token).then((all) => {
+      if (!cancelled) setLatestProjects(all.slice(0, 6));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   return (
-    <div>
+    <>
       {/* Hero */}
       <section className="bg-accent/15">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
@@ -115,6 +127,120 @@ export default function HomePage() {
           </div>
         </section>
       </div>
+    </>
+  );
+}
+
+function FollowingFeed({ token }: { token: string | null }) {
+  const [projects, setProjects] = useState<any[]>([]);
+  const [followingCount, setFollowingCount] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const creators = getCreators();
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+
+    async function load() {
+      try {
+        const res = await fetch('/api/feed/following', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled) {
+            setProjects(data.projects ?? []);
+            setFollowingCount(data.followingCount ?? 0);
+          }
+          return;
+        }
+      } catch {
+        // API indisponível — trata como feed vazio abaixo.
+      }
+      if (!cancelled) {
+        setProjects([]);
+        setFollowingCount(0);
+      }
+    }
+
+    load().finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
+      <h1 className="text-2xl font-extrabold text-foreground mb-1">Seu feed</h1>
+      <p className="text-muted-foreground mb-8">Projetos recentes de quem você segue.</p>
+
+      {loading ? (
+        <div className="columns-1 sm:columns-2 lg:columns-3 gap-6">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div
+              key={i}
+              className="mb-6 break-inside-avoid animate-pulse bg-white rounded-2xl border border-gray-100"
+              style={{ height: 220 + (i % 3) * 60 }}
+            />
+          ))}
+        </div>
+      ) : followingCount === 0 ? (
+        <div>
+          <EmptyState
+            icon={UserPlus}
+            title="Você ainda não segue ninguém"
+            description="Siga criadores pra ver os projetos deles aqui no seu feed."
+          />
+          {creators.length > 0 && (
+            <div className="mt-4">
+              <h2 className="text-lg font-bold text-foreground mb-4">Sugestões de criadores</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {creators.map((creator) => (
+                  <CreatorCard
+                    key={creator.id}
+                    name={creator.fullName}
+                    handle={creator.username}
+                    followers={creator.followers}
+                    avatarUrl={creator.avatarUrl}
+                    coverUrl={creator.coverUrl}
+                    tags={creator.skills}
+                    bio={creator.bio}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : projects.length === 0 ? (
+        <EmptyState
+          icon={Users}
+          title="Quem você segue ainda não publicou nada"
+          description="Volte mais tarde ou explore novos criadores enquanto isso."
+          actionLabel="Explorar Descobrir"
+          actionTo="/descobrir"
+        />
+      ) : (
+        <div className="columns-1 sm:columns-2 lg:columns-3 gap-6">
+          {projects.map((project: any) => (
+            <div key={project.id} className="mb-6 break-inside-avoid">
+              <ProjectCard project={project} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function HomePage() {
+  const { user, token } = useAuthStore();
+
+  return (
+    <div>
+      {user ? <FollowingFeed token={token} /> : <DiscoveryHome token={token} />}
 
       {/* Recursos */}
       <section className="border-t border-border">

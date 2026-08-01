@@ -1,7 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuthStore } from '../store/auth';
-import { mockLogin, mockRegister } from '../mockData';
 import { Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,9 +21,18 @@ export default function LoginPage({ isRegister = false }: { isRegister?: boolean
     setError('');
 
     try {
-      const data = isRegister
-        ? mockRegister({ email: emailOrUsername, password, username, fullName })
-        : mockLogin(emailOrUsername, password);
+      const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
+      const body = isRegister
+        ? { username, email: emailOrUsername, password, fullName }
+        : { emailOrUsername, password };
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Ocorreu um erro.');
 
       login(data.token, data.user);
       navigate('/');
@@ -101,10 +109,6 @@ export default function LoginPage({ isRegister = false }: { isRegister?: boolean
               {isRegister ? 'Cadastrar' : 'Entrar'}
             </Button>
           </form>
-
-          {!isRegister && (
-            <p className="mt-4 text-center text-xs text-muted-foreground">Conta de teste: admin / admin</p>
-          )}
 
           <div className="mt-8 text-center text-sm text-muted-foreground font-medium">
             {isRegister ? 'Já tem uma conta?' : 'Ainda não tem conta?'}
