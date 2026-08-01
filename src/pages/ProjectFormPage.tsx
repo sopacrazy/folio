@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
@@ -94,7 +95,20 @@ export default function ProjectFormPage() {
   if (!user) return null;
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Carregando...</div>;
+    return (
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <Card className="p-8 md:p-12">
+          <Skeleton className="h-8 w-48 mb-8" />
+          <Skeleton className="w-full aspect-[21/9] md:aspect-[3/1] rounded-2xl mb-8" />
+          <Skeleton className="h-4 w-32 mb-2" />
+          <Skeleton className="h-10 w-full rounded-xl mb-8" />
+          <Skeleton className="h-4 w-40 mb-2" />
+          <Skeleton className="h-10 w-full rounded-xl mb-8" />
+          <Skeleton className="h-4 w-24 mb-2" />
+          <Skeleton className="h-24 w-full rounded-xl" />
+        </Card>
+      </div>
+    );
   }
 
   if (notFound) {

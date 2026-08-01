@@ -6,6 +6,7 @@ import { useAuthStore } from '../store/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 export default function ProjectPage() {
@@ -106,7 +107,33 @@ export default function ProjectPage() {
   }, [project, source]);
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Carregando...</div>;
+    return (
+      <div className="bg-white min-h-screen">
+        <div className="border-b border-border">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+            <Skeleton className="h-6 w-16" />
+            <Skeleton className="h-8 w-28 rounded-full" />
+          </div>
+        </div>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+          <Skeleton className="w-full h-56 rounded-2xl mb-6" />
+          <Skeleton className="h-6 w-2/3 mb-4" />
+          <div className="flex items-center gap-2 mb-6">
+            <Skeleton className="w-6 h-6 rounded-full" />
+            <Skeleton className="h-4 w-40" />
+          </div>
+          <div className="space-y-2 mb-8">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-2/3" />
+          </div>
+          <div className="flex items-center justify-between border-t border-border pt-6">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-40" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const isOwner = currentUser?.id === project?.ownerId;

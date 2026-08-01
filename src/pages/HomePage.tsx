@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { ArrowRight, Briefcase, Coffee, Heart, Sparkles, Sprout, UserPlus, Users } from 'lucide-react';
+import { ArrowRight, Briefcase, Coffee, Heart, Share2, Sprout, UserPlus, Users } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { getCreators } from '../mockData';
 import { fetchProjectFeed } from '../lib/projects';
@@ -243,7 +243,7 @@ export default function HomePage() {
       {user ? <FollowingFeed token={token} /> : <DiscoveryHome token={token} />}
 
       {/* Recursos */}
-      <section className="border-t border-border">
+      <section className="bg-white border-t border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 grid grid-cols-1 sm:grid-cols-3 gap-10">
           <div className="text-center sm:text-left">
             <Heart className="w-6 h-6 text-primary mb-3 mx-auto sm:mx-0" />
@@ -251,7 +251,7 @@ export default function HomePage() {
             <p className="text-sm text-muted-foreground">Siga seus criadores favoritos e ajude-os a continuar criando.</p>
           </div>
           <div className="text-center sm:text-left">
-            <Sparkles className="w-6 h-6 text-primary mb-3 mx-auto sm:mx-0" />
+            <Share2 className="w-6 h-6 text-primary mb-3 mx-auto sm:mx-0" />
             <h3 className="font-bold text-foreground mb-1">Compartilhe e Conecte-se</h3>
             <p className="text-sm text-muted-foreground">Faça parte de uma comunidade que celebra trabalho original.</p>
           </div>

@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
@@ -159,7 +160,34 @@ export default function SettingsProfilePage() {
   };
 
   if (loading) {
-    return <div className="text-muted-foreground text-sm">Carregando...</div>;
+    return (
+      <Card className="rounded-xl">
+        <CardContent className="p-5">
+          <Skeleton className="h-5 w-32 mb-2" />
+          <Skeleton className="h-4 w-64 mb-6" />
+
+          <Skeleton className="h-24 sm:h-28 w-full rounded-xl mb-6" />
+
+          <div className="flex items-center gap-4 mb-6">
+            <Skeleton className="w-14 h-14 rounded-full shrink-0" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-8 w-28 rounded-full" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            <Skeleton className="h-10 w-full rounded-xl" />
+            <Skeleton className="h-10 w-full rounded-xl" />
+          </div>
+          <Skeleton className="h-20 w-full rounded-xl mb-6" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Skeleton className="h-10 w-full rounded-xl" />
+            <Skeleton className="h-10 w-full rounded-xl" />
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
