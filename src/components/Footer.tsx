@@ -33,7 +33,7 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-8">
           <div className="col-span-2 sm:col-span-1">
-            <Link to="/" className="flex items-center gap-2 text-lg font-extrabold text-white w-fit">
+            <Link to="/" className="flex items-center gap-2 text-lg font-bold text-white w-fit">
               <Heart className="w-4 h-4 fill-primary text-primary" /> Folio
             </Link>
             <p className="text-sm mt-2 max-w-[22ch]">A rede social de portfólios para criadores.</p>

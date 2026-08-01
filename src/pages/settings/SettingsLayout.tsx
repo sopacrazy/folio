@@ -22,7 +22,7 @@ export default function SettingsLayout() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      <h1 className="text-2xl font-extrabold text-foreground mb-6">Configurações</h1>
+      <h1 className="text-2xl font-bold text-foreground mb-6">Configurações</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-[180px_minmax(0,1fr)] gap-6">
         <nav className="flex lg:flex-col gap-1 overflow-x-auto no-scrollbar lg:overflow-visible pb-1 lg:pb-0">

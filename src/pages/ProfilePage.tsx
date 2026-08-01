@@ -172,7 +172,7 @@ export default function ProfilePage() {
 
             <div className="pb-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-2xl md:text-3xl font-extrabold text-foreground">{user.fullName}</h1>
+                <h1 className="text-2xl md:text-3xl font-bold text-foreground">{user.fullName}</h1>
                 {user.category && (
                   <span className="bg-tag text-tag-foreground text-[11px] font-semibold px-2.5 py-1 rounded-full">
                     {user.category}

@@ -235,7 +235,7 @@ export default function ProjectFormPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <Card className="p-8 md:p-12">
-        <h1 className="text-3xl font-extrabold text-foreground mb-8">
+        <h1 className="text-3xl font-bold text-foreground mb-8">
           {isEditMode ? 'Editar projeto' : 'Novo projeto'}
         </h1>
 

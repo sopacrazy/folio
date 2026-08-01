@@ -15,6 +15,7 @@
     "@aws-sdk/client-dynamodb": "^3.1100.0",
     "@aws-sdk/client-s3": "^3.1101.0",
     "@aws-sdk/lib-dynamodb": "^3.1100.0",
+    "@fontsource/inter": "^5.3.0",
     "@google/genai": "^2.4.0",
     "@libsql/client": "^0.17.4",
     "@radix-ui/react-avatar": "^1.2.6",

@@ -49,7 +49,7 @@ export default function LoginPage({ isRegister = false }: { isRegister?: boolean
             <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
               <Heart className="w-6 h-6 text-primary-foreground fill-current" />
             </div>
-            <h2 className="text-2xl font-extrabold text-foreground">
+            <h2 className="text-2xl font-bold text-foreground">
               {isRegister ? 'Crie sua conta' : 'Bem-vindo de volta'}
             </h2>
             <p className="text-muted-foreground mt-2">

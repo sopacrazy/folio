@@ -64,7 +64,7 @@ function DiscoveryHome({ token }: { token: string | null }) {
       <section className="bg-accent/15">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
           <div>
-            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-foreground leading-tight">
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-foreground leading-tight">
               Descubra portfólios criativos que inspiram.
             </h1>
             <p className="text-lg text-muted-foreground mt-6 max-w-xl">
@@ -174,7 +174,7 @@ function FollowingFeed({ token }: { token: string | null }) {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-      <h1 className="text-2xl font-extrabold text-foreground mb-1">Seu feed</h1>
+      <h1 className="text-2xl font-bold text-foreground mb-1">Seu feed</h1>
       <p className="text-muted-foreground mb-8">Projetos recentes de quem você segue.</p>
 
       {loading ? (
