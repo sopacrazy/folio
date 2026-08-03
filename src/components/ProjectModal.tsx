@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router';
-import { Check, Copy, Eye, Heart, Pencil, Share2 } from 'lucide-react';
+import { useParams, useLocation, useNavigate, Link } from 'react-router';
+import { Check, Copy, Eye, Heart, Pencil, Share2, User, UserCheck, UserPlus, X } from 'lucide-react';
 import { getProjectByUsernameAndSlug, incrementProjectViewCount } from '../mockData';
 import { useAuthStore } from '../store/auth';
-import Lightbox from '../components/Lightbox';
+import Lightbox from './Lightbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -52,6 +52,7 @@ interface SidebarProps {
   copied: boolean;
   onCopyLink: () => void;
   onShare: () => void;
+  editHref: string;
 }
 
 /** Coluna sticky à direita — só existe a partir de 768px (ver <MobileActionBar /> abaixo disso). */
@@ -68,6 +69,7 @@ function DesktopSidebar({
   copied,
   onCopyLink,
   onShare,
+  editHref,
 }: SidebarProps) {
   const profileHref = `/@${project.user.username}`;
 
@@ -85,18 +87,31 @@ function DesktopSidebar({
           </div>
         </Link>
 
-        {!isOwner && (
-          <Button
-            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-            disabled={!isReal || followLoading}
-            onClick={onFollowToggle}
-          >
-            {isFollowing ? 'Seguindo' : 'Seguir'}
+        <div className="flex items-center gap-2">
+          {isOwner ? (
+            <Button asChild size="icon" variant="outline" aria-label="Editar projeto" title="Editar projeto">
+              <Link to={editHref}>
+                <Pencil className="w-4 h-4" />
+              </Link>
+            </Button>
+          ) : (
+            <Button
+              size="icon"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
+              disabled={!isReal || followLoading}
+              onClick={onFollowToggle}
+              aria-label={isFollowing ? 'Seguindo' : 'Seguir'}
+              title={isFollowing ? 'Seguindo' : 'Seguir'}
+            >
+              {isFollowing ? <UserCheck className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
+            </Button>
+          )}
+          <Button asChild size="icon" variant="outline" aria-label="Ver perfil" title="Ver perfil">
+            <Link to={profileHref}>
+              <User className="w-4 h-4" />
+            </Link>
           </Button>
-        )}
-        <Button asChild variant="outline" className="w-full">
-          <Link to={profileHref}>Ver perfil</Link>
-        </Button>
+        </div>
 
         <div className="flex items-center gap-4 text-sm text-muted-foreground pt-4 border-t border-border">
           <span className="flex items-center gap-1.5">
@@ -123,7 +138,7 @@ function DesktopSidebar({
   );
 }
 
-/** Barra horizontal sticky abaixo do header do site — só existe abaixo de 768px. */
+/** Barra horizontal sticky no topo do conteúdo do modal — só existe abaixo de 768px. */
 function MobileActionBar({
   project,
   isOwner,
@@ -136,11 +151,12 @@ function MobileActionBar({
   copied,
   onCopyLink,
   onShare,
+  editHref,
 }: SidebarProps) {
   const profileHref = `/@${project.user.username}`;
 
   return (
-    <div className="md:hidden sticky top-16 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2.5 bg-white/95 backdrop-blur border-b border-border flex items-center justify-between gap-2 mb-6">
+    <div className="md:hidden sticky top-0 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2.5 bg-white/95 backdrop-blur border-b border-border flex items-center justify-between gap-2 mb-6">
       <Link to={profileHref} className="flex items-center gap-2 min-w-0">
         <Avatar className="w-8 h-8 shrink-0">
           <AvatarImage src={project.user.avatarUrl} alt={project.user.fullName} />
@@ -150,14 +166,22 @@ function MobileActionBar({
       </Link>
 
       <div className="flex items-center gap-1.5 shrink-0">
-        {!isOwner && (
+        {isOwner ? (
+          <Button asChild size="icon" variant="outline" aria-label="Editar projeto" title="Editar projeto">
+            <Link to={editHref}>
+              <Pencil className="w-4 h-4" />
+            </Link>
+          </Button>
+        ) : (
           <Button
-            size="sm"
+            size="icon"
             className="bg-primary hover:bg-primary/90 text-primary-foreground"
             disabled={!isReal || followLoading}
             onClick={onFollowToggle}
+            aria-label={isFollowing ? 'Seguindo' : 'Seguir'}
+            title={isFollowing ? 'Seguindo' : 'Seguir'}
           >
-            {isFollowing ? 'Seguindo' : 'Seguir'}
+            {isFollowing ? <UserCheck className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
           </Button>
         )}
         <ActionIconButton onClick={onLikeToggle} label={liked ? 'Descurtir' : 'Curtir'} active={liked} disabled={!isReal}>
@@ -174,11 +198,13 @@ function MobileActionBar({
   );
 }
 
-export default function ProjectPage() {
+export default function ProjectModal() {
   const { handle, slug } = useParams();
   const username = handle?.startsWith('@') ? handle.slice(1) : handle;
   const { user: currentUser, token } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
+  const backgroundLocation = (location.state as { backgroundLocation?: unknown } | null)?.backgroundLocation;
 
   const [project, setProject] = useState<any>(null);
   const [source, setSource] = useState<'real' | 'mock' | null>(null);
@@ -190,6 +216,15 @@ export default function ProjectPage() {
   const [followLoading, setFollowLoading] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const viewCounted = useRef(false);
+
+  // Fecha o modal usando o histórico do navegador: se veio de uma navegação
+  // dentro do app (backgroundLocation), "voltar" restaura a página de origem
+  // naturalmente. Se foi acesso direto (refresh, link compartilhado), não há
+  // pra onde voltar — manda pra Home.
+  const close = () => {
+    if (backgroundLocation) navigate(-1);
+    else navigate('/', { replace: true });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -258,6 +293,37 @@ export default function ProjectPage() {
     };
   }, [project, source, token, currentUser?.id]);
 
+  useEffect(() => {
+    if (!project || viewCounted.current) return;
+    viewCounted.current = true;
+
+    if (source === 'real') {
+      fetch(`/api/projects/${project.id}/view`, { method: 'POST' }).catch(() => {});
+    } else if (source === 'mock') {
+      incrementProjectViewCount(project.id);
+    }
+  }, [project, source]);
+
+  // Esc fecha o modal — mas só quando o lightbox da galeria não está aberto por
+  // cima dele (o lightbox tem seu próprio Esc; um Esc só deve fechar uma camada
+  // por vez, não as duas de uma vez).
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && lightboxIndex === null) close();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [lightboxIndex, backgroundLocation]);
+
+  // Trava o scroll da página de fundo enquanto o modal está aberto.
+  useEffect(() => {
+    const original = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = original;
+    };
+  }, []);
+
   const handleLikeToggle = async () => {
     if (source !== 'real' || !project) return;
     if (!token) {
@@ -308,58 +374,6 @@ export default function ProjectPage() {
     }
   };
 
-  useEffect(() => {
-    if (!project || viewCounted.current) return;
-    viewCounted.current = true;
-
-    if (source === 'real') {
-      fetch(`/api/projects/${project.id}/view`, { method: 'POST' }).catch(() => {});
-    } else if (source === 'mock') {
-      incrementProjectViewCount(project.id);
-    }
-  }, [project, source]);
-
-  if (loading) {
-    return (
-      <div className="bg-white min-h-screen">
-        <div className="border-b border-border">
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-            <Skeleton className="h-6 w-16" />
-            <Skeleton className="h-8 w-28 rounded-full" />
-          </div>
-        </div>
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-          <Skeleton className="w-full h-56 rounded-2xl mb-6" />
-          <Skeleton className="h-6 w-2/3 mb-4" />
-          <div className="flex items-center gap-2 mb-6">
-            <Skeleton className="w-6 h-6 rounded-full" />
-            <Skeleton className="h-4 w-40" />
-          </div>
-          <div className="space-y-2 mb-8">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-2/3" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const isOwner = currentUser?.id === project?.ownerId;
-  const isReal = source === 'real';
-
-  if (!project || (!project.isPublic && !isOwner)) {
-    return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
-        <h1 className="text-xl font-bold text-foreground mb-2">Projeto não encontrado</h1>
-        <p className="text-muted-foreground mb-6">Esse projeto não existe ou não está mais disponível.</p>
-        <Button asChild variant="outline">
-          <Link to="/descobrir">Explorar outros projetos</Link>
-        </Button>
-      </div>
-    );
-  }
-
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
@@ -371,7 +385,7 @@ export default function ProjectPage() {
   };
 
   const handleShare = async () => {
-    const shareData = { title: project.title, url: window.location.href };
+    const shareData = { title: project?.title, url: window.location.href };
     if (navigator.share) {
       try {
         await navigator.share(shareData);
@@ -383,116 +397,145 @@ export default function ProjectPage() {
     }
   };
 
-  const publishedDate = new Date(project.createdAt).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
-  const gallery: string[] = project.gallery ?? [];
+  const isOwner = currentUser?.id === project?.ownerId;
+  const isReal = source === 'real';
+  const editHref = `/@${username}/${slug}/editar`;
+  const gallery: string[] = project?.gallery ?? [];
+  const notFound = !loading && (!project || (!project.isPublic && !isOwner));
 
   return (
-    <div className="bg-white min-h-screen">
-      {/* Header simples */}
-      <div className="border-b border-border">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-          <Link to="/" className="font-bold text-lg tracking-tight text-primary">
-            Portsy
-          </Link>
-          {isOwner && (
-            <Button asChild variant="outline" size="sm">
-              <Link to={`/@${username}/${slug}/editar`}>
-                <Pencil className="w-3.5 h-3.5" /> Editar
-              </Link>
-            </Button>
+    <div className="fixed inset-0 z-[70] bg-black/60 md:flex md:items-center md:justify-center" onClick={close}>
+      <div
+        className="relative bg-white/95 backdrop-blur-xl w-full h-full md:w-[90%] md:h-[90%] md:rounded-2xl md:shadow-2xl overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={close}
+          aria-label="Fechar"
+          className="absolute top-4 right-4 z-40 w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-sm text-white flex items-center justify-center transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="overflow-y-auto flex-1">
+          {loading ? (
+            <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8">
+              <Skeleton className="w-full h-56 rounded-2xl mb-6" />
+              <Skeleton className="h-6 w-2/3 mb-4" />
+              <div className="flex items-center gap-2 mb-6">
+                <Skeleton className="w-6 h-6 rounded-full" />
+                <Skeleton className="h-4 w-40" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-2/3" />
+              </div>
+            </div>
+          ) : notFound ? (
+            <div className="min-h-[50vh] flex flex-col items-center justify-center text-center px-4">
+              <h1 className="text-xl font-bold text-foreground mb-2">Projeto não encontrado</h1>
+              <p className="text-muted-foreground mb-6">Esse projeto não existe ou não está mais disponível.</p>
+              <Button variant="outline" onClick={close}>Fechar</Button>
+            </div>
+          ) : (
+            <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8">
+              {!project.isPublic && (
+                <div className="bg-tag text-tag-foreground text-sm font-medium text-center py-2 -mx-4 sm:-mx-8 mb-6">
+                  Este projeto é um rascunho — só você consegue vê-lo.
+                </div>
+              )}
+
+              <MobileActionBar
+                project={project}
+                isOwner={isOwner}
+                isReal={isReal}
+                liked={liked}
+                likeCount={likeCount}
+                onLikeToggle={handleLikeToggle}
+                isFollowing={isFollowing}
+                followLoading={followLoading}
+                onFollowToggle={handleFollowToggle}
+                copied={copied}
+                onCopyLink={handleCopyLink}
+                onShare={handleShare}
+                editHref={editHref}
+              />
+
+              <div className="md:grid md:grid-cols-[1fr_240px] md:gap-10">
+                <div className="min-w-0">
+                  {/* Capa */}
+                  <img
+                    src={project.coverImageUrl}
+                    alt={project.title}
+                    className="w-full h-64 sm:h-80 lg:h-[26rem] rounded-2xl object-cover mb-6"
+                  />
+
+                  {/* Título */}
+                  <h1 className="text-xl font-medium text-foreground mb-3">{project.title}</h1>
+
+                  <p className="text-sm text-muted-foreground mb-4">
+                    publicado em {new Date(project.createdAt).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}
+                  </p>
+
+                  {/* Tags */}
+                  {project.tags?.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-5">
+                      {project.tags.map((tag: string) => (
+                        <Badge key={tag} variant="secondary">{tag}</Badge>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Descrição */}
+                  {project.description && (
+                    <p className="text-muted-foreground leading-relaxed mb-8 whitespace-pre-wrap">{project.description}</p>
+                  )}
+
+                  {/* Galeria */}
+                  {gallery.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {gallery.map((url, index) => (
+                        <button
+                          key={url + index}
+                          type="button"
+                          onClick={() => setLightboxIndex(index)}
+                          className={cn(
+                            'block rounded-2xl overflow-hidden group focus-visible:outline-2 focus-visible:outline-primary',
+                            index === 0 ? 'sm:col-span-2' : ''
+                          )}
+                          aria-label={`Ampliar imagem ${index + 1} da galeria`}
+                        >
+                          <img
+                            src={url}
+                            alt=""
+                            className="w-full h-full object-cover group-hover:opacity-90 group-hover:scale-[1.02] transition-all duration-300"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <DesktopSidebar
+                  project={project}
+                  isOwner={isOwner}
+                  isReal={isReal}
+                  liked={liked}
+                  likeCount={likeCount}
+                  onLikeToggle={handleLikeToggle}
+                  isFollowing={isFollowing}
+                  followLoading={followLoading}
+                  onFollowToggle={handleFollowToggle}
+                  copied={copied}
+                  onCopyLink={handleCopyLink}
+                  onShare={handleShare}
+                  editHref={editHref}
+                />
+              </div>
+            </div>
           )}
-        </div>
-      </div>
-
-      {!project.isPublic && (
-        <div className="bg-tag text-tag-foreground text-sm font-medium text-center py-2">
-          Este projeto é um rascunho — só você consegue vê-lo.
-        </div>
-      )}
-
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-        <MobileActionBar
-          project={project}
-          isOwner={isOwner}
-          isReal={isReal}
-          liked={liked}
-          likeCount={likeCount}
-          onLikeToggle={handleLikeToggle}
-          isFollowing={isFollowing}
-          followLoading={followLoading}
-          onFollowToggle={handleFollowToggle}
-          copied={copied}
-          onCopyLink={handleCopyLink}
-          onShare={handleShare}
-        />
-
-        <div className="md:grid md:grid-cols-[1fr_240px] md:gap-10">
-          <div className="max-w-3xl min-w-0">
-            {/* Capa */}
-            <img
-              src={project.coverImageUrl}
-              alt={project.title}
-              className="w-full h-56 sm:h-72 rounded-2xl object-cover mb-6"
-            />
-
-            {/* Título */}
-            <h1 className="text-xl font-medium text-foreground mb-3">{project.title}</h1>
-
-            <p className="text-sm text-muted-foreground mb-4">publicado em {publishedDate}</p>
-
-            {/* Tags */}
-            {project.tags?.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mb-5">
-                {project.tags.map((tag: string) => (
-                  <Badge key={tag} variant="secondary">{tag}</Badge>
-                ))}
-              </div>
-            )}
-
-            {/* Descrição */}
-            {project.description && (
-              <p className="text-muted-foreground leading-relaxed mb-8 whitespace-pre-wrap">{project.description}</p>
-            )}
-
-            {/* Galeria */}
-            {gallery.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {gallery.map((url, index) => (
-                  <button
-                    key={url + index}
-                    type="button"
-                    onClick={() => setLightboxIndex(index)}
-                    className={cn(
-                      'block rounded-2xl overflow-hidden group focus-visible:outline-2 focus-visible:outline-primary',
-                      index === 0 ? 'sm:col-span-2' : ''
-                    )}
-                    aria-label={`Ampliar imagem ${index + 1} da galeria`}
-                  >
-                    <img
-                      src={url}
-                      alt=""
-                      className="w-full h-full object-cover group-hover:opacity-90 group-hover:scale-[1.02] transition-all duration-300"
-                    />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <DesktopSidebar
-            project={project}
-            isOwner={isOwner}
-            isReal={isReal}
-            liked={liked}
-            likeCount={likeCount}
-            onLikeToggle={handleLikeToggle}
-            isFollowing={isFollowing}
-            followLoading={followLoading}
-            onFollowToggle={handleFollowToggle}
-            copied={copied}
-            onCopyLink={handleCopyLink}
-            onShare={handleShare}
-          />
         </div>
       </div>
 

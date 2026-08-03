@@ -1,5 +1,5 @@
 import { useState, FormEvent } from 'react';
-import { Routes, Route, Navigate, Link, NavLink, useNavigate } from 'react-router';
+import { Routes, Route, Navigate, Link, NavLink, useLocation, useNavigate, matchPath, type Location } from 'react-router';
 import { useAuthStore } from './store/auth';
 import { Mail, Menu, Plus, Search, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,17 +14,20 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import Footer from './components/Footer';
+import ProjectModal from './components/ProjectModal';
 import HomePage from './pages/HomePage';
 import DiscoverPage from './pages/DiscoverPage';
 import CreatorsPage from './pages/CreatorsPage';
 import ProfilePage from './pages/ProfilePage';
-import ProjectPage from './pages/ProjectPage';
 import ProjectFormPage from './pages/ProjectFormPage';
 import LoginPage from './pages/LoginPage';
 import SettingsLayout from './pages/settings/SettingsLayout';
 import SettingsProfilePage from './pages/settings/SettingsProfilePage';
 import SettingsAccountPage from './pages/settings/SettingsAccountPage';
 import SettingsPlaceholderPage from './pages/settings/SettingsPlaceholderPage';
+
+/** Caminho de projeto (/@usuario/slug) — exatamente 2 segmentos, sem bater com /:handle/:slug/editar. */
+const PROJECT_PATH = '/:handle/:slug';
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
@@ -174,11 +177,21 @@ function Navbar() {
 }
 
 export default function App() {
+  const location = useLocation();
+  const state = location.state as { backgroundLocation?: Location } | null;
+
+  // Acesso direto a /@usuario/slug (sem vir navegando de dentro do app — refresh,
+  // link compartilhado): não existe um "fundo" real pra mostrar, então forçamos a
+  // Home como pano de fundo genérico e ainda assim abrimos o modal por cima dela.
+  const isDirectProjectAccess = !state?.backgroundLocation && matchPath({ path: PROJECT_PATH, end: true }, location.pathname);
+  const backgroundLocation: Location | undefined =
+    state?.backgroundLocation ?? (isDirectProjectAccess ? { ...location, pathname: '/', search: '', hash: '' } : undefined);
+
   return (
     <div className="min-h-screen bg-muted font-sans text-foreground">
       <Navbar />
       <main>
-        <Routes>
+        <Routes location={backgroundLocation ?? location}>
           <Route path="/" element={<HomePage />} />
           <Route path="/descobrir" element={<DiscoverPage />} />
           <Route path="/criadores" element={<CreatorsPage />} />
@@ -186,7 +199,6 @@ export default function App() {
           <Route path="/register" element={<LoginPage isRegister />} />
           <Route path="/novo-projeto" element={<ProjectFormPage />} />
           <Route path="/:handle" element={<ProfilePage />} />
-          <Route path="/:handle/:slug" element={<ProjectPage />} />
           <Route path="/:handle/:slug/editar" element={<ProjectFormPage />} />
           <Route path="/configuracoes" element={<SettingsLayout />}>
             <Route index element={<Navigate to="/configuracoes/perfil" replace />} />
@@ -198,6 +210,15 @@ export default function App() {
         </Routes>
       </main>
       <Footer />
+
+      {/* Camada de modal: só existe quando há um "fundo" definido (navegação in-app
+          ou acesso direto forçado pra Home). Usa a location REAL (não a de fundo)
+          pra bater com a URL do projeto de verdade. */}
+      {backgroundLocation && (
+        <Routes>
+          <Route path="/:handle/:slug" element={<ProjectModal />} />
+        </Routes>
+      )}
     </div>
   );
 }

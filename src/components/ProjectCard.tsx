@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { Heart, MessageCircle } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -17,6 +17,10 @@ export default function ProjectCard({ project }: ProjectCardProps) {
   const isReal = project.source !== 'mock';
   const { token } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Abre o projeto como modal por cima da página atual, guardando ela como "fundo"
+  // pra restaurar quando o modal fechar (ver App.tsx e ProjectModal.tsx).
+  const modalLinkState = { backgroundLocation: location };
 
   const [liked, setLiked] = useState(Boolean(project.likedByMe));
   const [likeCount, setLikeCount] = useState(project.likeCount || 0);
@@ -61,7 +65,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
         </Badge>
       )}
 
-      <Link to={href} className="block overflow-hidden">
+      <Link to={href} state={modalLinkState} className="block overflow-hidden">
         <img
           src={project.coverImageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop'}
           alt={project.title}
@@ -71,7 +75,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
       </Link>
 
       <div className="p-4">
-        <Link to={href}>
+        <Link to={href} state={modalLinkState}>
           <h3 className="font-bold text-sm text-foreground hover:text-primary transition-colors line-clamp-1">
             {project.title}
           </h3>

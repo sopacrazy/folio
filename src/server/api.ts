@@ -299,7 +299,7 @@ router.get('/users/:username', optionalAuthenticate, async (req: any, res) => {
     const sortedProjects = projects
       .slice()
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .map((p) => toProjectResponse(p, undefined, likedIds.has(p.id)));
+      .map((p) => toProjectResponse(p, user, likedIds.has(p.id)));
 
     res.json({ ...toProfile(user), badges, projects: sortedProjects, isFollowingByMe });
   } catch (error: any) {
