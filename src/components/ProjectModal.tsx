@@ -406,7 +406,7 @@ export default function ProjectModal() {
   return (
     <div className="fixed inset-0 z-[70] bg-black/60 md:flex md:items-center md:justify-center" onClick={close}>
       <div
-        className="relative bg-white/95 backdrop-blur-xl w-full h-full md:w-[90%] md:h-[90%] md:rounded-2xl md:shadow-2xl overflow-hidden flex flex-col"
+        className="relative bg-white/95 backdrop-blur-xl w-full h-full md:w-[97%] md:h-[97%] md:rounded-2xl md:shadow-2xl overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -420,7 +420,7 @@ export default function ProjectModal() {
 
         <div className="overflow-y-auto flex-1">
           {loading ? (
-            <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8">
+            <div className="px-4 sm:px-6 py-8">
               <Skeleton className="w-full h-56 rounded-2xl mb-6" />
               <Skeleton className="h-6 w-2/3 mb-4" />
               <div className="flex items-center gap-2 mb-6">
@@ -440,9 +440,9 @@ export default function ProjectModal() {
               <Button variant="outline" onClick={close}>Fechar</Button>
             </div>
           ) : (
-            <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8">
+            <div className="px-4 sm:px-6 py-8">
               {!project.isPublic && (
-                <div className="bg-tag text-tag-foreground text-sm font-medium text-center py-2 -mx-4 sm:-mx-8 mb-6">
+                <div className="bg-tag text-tag-foreground text-sm font-medium text-center py-2 -mx-4 sm:-mx-6 mb-6">
                   Este projeto é um rascunho — só você consegue vê-lo.
                 </div>
               )}
@@ -469,7 +469,7 @@ export default function ProjectModal() {
                   <img
                     src={project.coverImageUrl}
                     alt={project.title}
-                    className="w-full h-64 sm:h-80 lg:h-[26rem] rounded-2xl object-cover mb-6"
+                    className="w-full h-auto rounded-2xl mb-6"
                   />
 
                   {/* Título */}
