@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useLocation, useNavigate, Link } from 'react-router';
-import { Check, Copy, Eye, Heart, Pencil, Share2, User, UserCheck, UserPlus, X } from 'lucide-react';
+import { Check, Copy, Eye, Heart, Pencil, Share2, UserCheck, UserPlus, X } from 'lucide-react';
 import { getProjectByUsernameAndSlug, incrementProjectViewCount } from '../mockData';
 import { useAuthStore } from '../store/auth';
 import Lightbox from './Lightbox';
@@ -29,8 +29,8 @@ function ActionIconButton({ onClick, label, active, disabled, children }: Action
       className={cn(
         'w-9 h-9 rounded-full border flex items-center justify-center transition-colors shrink-0',
         active
-          ? 'bg-red-50 border-red-200 text-red-500'
-          : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted',
+          ? 'bg-red-500/20 border-red-500/30 text-red-400'
+          : 'border-white/15 text-white/70 hover:text-white hover:bg-white/10',
         disabled && 'opacity-50 cursor-default pointer-events-none'
       )}
     >
@@ -55,7 +55,9 @@ interface SidebarProps {
   editHref: string;
 }
 
-/** Coluna sticky à direita — só existe a partir de 768px (ver <MobileActionBar /> abaixo disso). */
+/** Trilha de ações flutuante à direita, fixa em relação ao painel do modal (não
+    rola junto com o conteúdo) — como no Behance. Só existe a partir de 768px
+    (ver <MobileActionBar /> abaixo disso). */
 function DesktopSidebar({
   project,
   isOwner,
@@ -74,65 +76,84 @@ function DesktopSidebar({
   const profileHref = `/@${project.user.username}`;
 
   return (
-    <aside className="hidden md:block">
-      <div className="sticky top-24 space-y-5">
-        <Link to={profileHref} className="flex items-center gap-3 min-w-0">
-          <Avatar className="w-12 h-12 shrink-0">
-            <AvatarImage src={project.user.avatarUrl} alt={project.user.fullName} />
-            <AvatarFallback>{project.user.fullName.charAt(0)}</AvatarFallback>
-          </Avatar>
-          <div className="min-w-0">
-            <p className="font-semibold text-foreground text-sm truncate">{project.user.fullName}</p>
-            <p className="text-xs text-muted-foreground truncate">@{project.user.username}</p>
-          </div>
+    <aside className="hidden md:flex flex-col items-center gap-5 absolute right-6 top-1/2 -translate-y-1/2 z-30">
+      <Link to={profileHref} className="flex flex-col items-center gap-1.5 group">
+        <Avatar className="w-11 h-11 border-2 border-white/20 group-hover:border-white/40 transition-colors">
+          <AvatarImage src={project.user.avatarUrl} alt={project.user.fullName} />
+          <AvatarFallback>{project.user.fullName.charAt(0)}</AvatarFallback>
+        </Avatar>
+        <span className="text-[11px] font-medium text-white/60 group-hover:text-white transition-colors">Perfil</span>
+      </Link>
+
+      {isOwner ? (
+        <Link to={editHref} className="flex flex-col items-center gap-1.5 text-white/60 hover:text-white transition-colors">
+          <span className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/15 flex items-center justify-center transition-colors">
+            <Pencil className="w-4 h-4" />
+          </span>
+          <span className="text-[11px] font-medium">Editar</span>
         </Link>
+      ) : (
+        <button
+          type="button"
+          onClick={onFollowToggle}
+          disabled={!isReal || followLoading}
+          className="flex flex-col items-center gap-1.5 text-white/60 hover:text-white transition-colors disabled:opacity-50 disabled:pointer-events-none"
+        >
+          <span
+            className={cn(
+              'w-11 h-11 rounded-full flex items-center justify-center transition-colors',
+              isFollowing ? 'bg-primary text-primary-foreground' : 'bg-white/10 hover:bg-white/15'
+            )}
+          >
+            {isFollowing ? <UserCheck className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
+          </span>
+          <span className="text-[11px] font-medium">{isFollowing ? 'Seguindo' : 'Seguir'}</span>
+        </button>
+      )}
 
-        <div className="flex items-center gap-2">
-          {isOwner ? (
-            <Button asChild size="icon" variant="outline" aria-label="Editar projeto" title="Editar projeto">
-              <Link to={editHref}>
-                <Pencil className="w-4 h-4" />
-              </Link>
-            </Button>
-          ) : (
-            <Button
-              size="icon"
-              className="bg-primary hover:bg-primary/90 text-primary-foreground"
-              disabled={!isReal || followLoading}
-              onClick={onFollowToggle}
-              aria-label={isFollowing ? 'Seguindo' : 'Seguir'}
-              title={isFollowing ? 'Seguindo' : 'Seguir'}
-            >
-              {isFollowing ? <UserCheck className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
-            </Button>
+      <button
+        type="button"
+        onClick={onLikeToggle}
+        disabled={!isReal}
+        aria-label={liked ? 'Descurtir' : 'Curtir'}
+        className="flex flex-col items-center gap-1.5 text-white/60 hover:text-white transition-colors disabled:opacity-50 disabled:pointer-events-none"
+      >
+        <span
+          className={cn(
+            'w-11 h-11 rounded-full flex items-center justify-center transition-colors',
+            liked ? 'bg-red-500/20 text-red-400' : 'bg-white/10 hover:bg-white/15'
           )}
-          <Button asChild size="icon" variant="outline" aria-label="Ver perfil" title="Ver perfil">
-            <Link to={profileHref}>
-              <User className="w-4 h-4" />
-            </Link>
-          </Button>
-        </div>
+        >
+          <Heart className={cn('w-4 h-4', liked && 'fill-red-400')} />
+        </span>
+        <span className="text-[11px] font-medium tabular-nums">{likeCount}</span>
+      </button>
 
-        <div className="flex items-center gap-4 text-sm text-muted-foreground pt-4 border-t border-border">
-          <span className="flex items-center gap-1.5">
-            <Heart className={cn('w-4 h-4', liked && 'fill-red-500 text-red-500')} /> {likeCount}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Eye className="w-4 h-4" /> {project.viewCount.toLocaleString('pt-BR')}
-          </span>
-        </div>
+      <button
+        type="button"
+        onClick={onShare}
+        className="flex flex-col items-center gap-1.5 text-white/60 hover:text-white transition-colors"
+      >
+        <span className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/15 flex items-center justify-center transition-colors">
+          <Share2 className="w-4 h-4" />
+        </span>
+        <span className="text-[11px] font-medium">Compartilhar</span>
+      </button>
 
-        <div className="flex items-center gap-2">
-          <ActionIconButton onClick={onLikeToggle} label={liked ? 'Descurtir' : 'Curtir'} active={liked} disabled={!isReal}>
-            <Heart className={cn('w-4 h-4', liked && 'fill-red-500 text-red-500')} />
-          </ActionIconButton>
-          <ActionIconButton onClick={onShare} label="Compartilhar">
-            <Share2 className="w-4 h-4" />
-          </ActionIconButton>
-          <ActionIconButton onClick={onCopyLink} label={copied ? 'Link copiado' : 'Copiar link'}>
-            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-          </ActionIconButton>
-        </div>
+      <button
+        type="button"
+        onClick={onCopyLink}
+        className="flex flex-col items-center gap-1.5 text-white/60 hover:text-white transition-colors"
+      >
+        <span className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/15 flex items-center justify-center transition-colors">
+          {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+        </span>
+        <span className="text-[11px] font-medium">{copied ? 'Copiado' : 'Copiar link'}</span>
+      </button>
+
+      <div className="flex flex-col items-center gap-1.5 text-white/40 pt-3 border-t border-white/10 w-full">
+        <Eye className="w-4 h-4" />
+        <span className="text-[11px] font-medium tabular-nums">{project.viewCount.toLocaleString('pt-BR')}</span>
       </div>
     </aside>
   );
@@ -156,18 +177,18 @@ function MobileActionBar({
   const profileHref = `/@${project.user.username}`;
 
   return (
-    <div className="md:hidden sticky top-0 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2.5 bg-white/95 backdrop-blur border-b border-border flex items-center justify-between gap-2 mb-6">
+    <div className="md:hidden sticky top-0 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2.5 bg-neutral-950/95 backdrop-blur border-b border-white/10 flex items-center justify-between gap-2 mb-6">
       <Link to={profileHref} className="flex items-center gap-2 min-w-0">
         <Avatar className="w-8 h-8 shrink-0">
           <AvatarImage src={project.user.avatarUrl} alt={project.user.fullName} />
           <AvatarFallback className="text-xs">{project.user.fullName.charAt(0)}</AvatarFallback>
         </Avatar>
-        <span className="text-sm font-semibold text-foreground truncate">{project.user.fullName}</span>
+        <span className="text-sm font-semibold text-white truncate">{project.user.fullName}</span>
       </Link>
 
       <div className="flex items-center gap-1.5 shrink-0">
         {isOwner ? (
-          <Button asChild size="icon" variant="outline" aria-label="Editar projeto" title="Editar projeto">
+          <Button asChild size="icon" variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/20" aria-label="Editar projeto" title="Editar projeto">
             <Link to={editHref}>
               <Pencil className="w-4 h-4" />
             </Link>
@@ -404,9 +425,9 @@ export default function ProjectModal() {
   const notFound = !loading && (!project || (!project.isPublic && !isOwner));
 
   return (
-    <div className="fixed inset-0 z-[70] bg-black/60 md:flex md:items-center md:justify-center" onClick={close}>
+    <div className="fixed inset-0 z-[70] bg-black/50 md:flex md:items-center md:justify-center" onClick={close}>
       <div
-        className="relative bg-white/95 backdrop-blur-xl w-full h-full md:w-[97%] md:h-[97%] md:rounded-2xl md:shadow-2xl overflow-hidden flex flex-col"
+        className="relative bg-neutral-950/60 backdrop-blur-md w-full h-full md:w-[97%] md:h-[97%] md:rounded-2xl md:shadow-2xl overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -420,27 +441,23 @@ export default function ProjectModal() {
 
         <div className="overflow-y-auto flex-1">
           {loading ? (
-            <div className="px-4 sm:px-6 py-8">
-              <Skeleton className="w-full h-56 rounded-2xl mb-6" />
-              <Skeleton className="h-6 w-2/3 mb-4" />
+            <div className="max-w-3xl mx-auto px-4 sm:px-6 md:pr-28 py-8">
+              <Skeleton className="h-7 w-2/3 mb-3 bg-white/10" />
               <div className="flex items-center gap-2 mb-6">
-                <Skeleton className="w-6 h-6 rounded-full" />
-                <Skeleton className="h-4 w-40" />
+                <Skeleton className="w-7 h-7 rounded-full bg-white/10" />
+                <Skeleton className="h-4 w-40 bg-white/10" />
               </div>
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-2/3" />
-              </div>
+              <Skeleton className="w-full h-80 rounded-2xl mb-4 bg-white/10" />
+              <Skeleton className="w-full h-80 rounded-2xl bg-white/10" />
             </div>
           ) : notFound ? (
             <div className="min-h-[50vh] flex flex-col items-center justify-center text-center px-4">
-              <h1 className="text-xl font-bold text-foreground mb-2">Projeto não encontrado</h1>
-              <p className="text-muted-foreground mb-6">Esse projeto não existe ou não está mais disponível.</p>
-              <Button variant="outline" onClick={close}>Fechar</Button>
+              <h1 className="text-xl font-bold text-white mb-2">Projeto não encontrado</h1>
+              <p className="text-white/60 mb-6">Esse projeto não existe ou não está mais disponível.</p>
+              <Button variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/20" onClick={close}>Fechar</Button>
             </div>
           ) : (
-            <div className="px-4 sm:px-6 py-8">
+            <div className="max-w-3xl mx-auto px-4 sm:px-6 md:pr-28 py-8">
               {!project.isPublic && (
                 <div className="bg-tag text-tag-foreground text-sm font-medium text-center py-2 -mx-4 sm:-mx-6 mb-6">
                   Este projeto é um rascunho — só você consegue vê-lo.
@@ -463,80 +480,81 @@ export default function ProjectModal() {
                 editHref={editHref}
               />
 
-              <div className="md:grid md:grid-cols-[1fr_240px] md:gap-10">
-                <div className="min-w-0">
-                  {/* Capa */}
-                  <img
-                    src={project.coverImageUrl}
-                    alt={project.title}
-                    className="w-full h-auto rounded-2xl mb-6"
-                  />
+              {/* Título */}
+              <h1 className="text-2xl font-semibold text-white mb-3">{project.title}</h1>
 
-                  {/* Título */}
-                  <h1 className="text-xl font-medium text-foreground mb-3">{project.title}</h1>
+              <Link to={`/@${project.user.username}`} className="inline-flex items-center gap-2 mb-4 group">
+                <Avatar className="w-7 h-7 shrink-0">
+                  <AvatarImage src={project.user.avatarUrl} alt={project.user.fullName} />
+                  <AvatarFallback className="text-xs">{project.user.fullName.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <span className="text-sm font-medium text-white/80 group-hover:text-white transition-colors">
+                  {project.user.fullName}
+                </span>
+                <span className="text-sm text-white/40">
+                  · publicado em {new Date(project.createdAt).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}
+                </span>
+              </Link>
 
-                  <p className="text-sm text-muted-foreground mb-4">
-                    publicado em {new Date(project.createdAt).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}
-                  </p>
-
-                  {/* Tags */}
-                  {project.tags?.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-5">
-                      {project.tags.map((tag: string) => (
-                        <Badge key={tag} variant="secondary">{tag}</Badge>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Descrição */}
-                  {project.description && (
-                    <p className="text-muted-foreground leading-relaxed mb-8 whitespace-pre-wrap">{project.description}</p>
-                  )}
-
-                  {/* Galeria */}
-                  {gallery.length > 0 && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {gallery.map((url, index) => (
-                        <button
-                          key={url + index}
-                          type="button"
-                          onClick={() => setLightboxIndex(index)}
-                          className={cn(
-                            'block rounded-2xl overflow-hidden group focus-visible:outline-2 focus-visible:outline-primary',
-                            index === 0 ? 'sm:col-span-2' : ''
-                          )}
-                          aria-label={`Ampliar imagem ${index + 1} da galeria`}
-                        >
-                          <img
-                            src={url}
-                            alt=""
-                            className="w-full h-full object-cover group-hover:opacity-90 group-hover:scale-[1.02] transition-all duration-300"
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  )}
+              {/* Tags */}
+              {project.tags?.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-5">
+                  {project.tags.map((tag: string) => (
+                    <Badge key={tag} variant="secondary">{tag}</Badge>
+                  ))}
                 </div>
+              )}
 
-                <DesktopSidebar
-                  project={project}
-                  isOwner={isOwner}
-                  isReal={isReal}
-                  liked={liked}
-                  likeCount={likeCount}
-                  onLikeToggle={handleLikeToggle}
-                  isFollowing={isFollowing}
-                  followLoading={followLoading}
-                  onFollowToggle={handleFollowToggle}
-                  copied={copied}
-                  onCopyLink={handleCopyLink}
-                  onShare={handleShare}
-                  editHref={editHref}
+              {/* Imagens do projeto — capa + galeria, uma abaixo da outra, no
+                  tamanho padrão da coluna (como no Behance). */}
+              <div className="space-y-4 mb-8">
+                <img
+                  src={project.coverImageUrl}
+                  alt={project.title}
+                  className="w-full h-auto rounded-2xl"
                 />
+                {gallery.map((url, index) => (
+                  <button
+                    key={url + index}
+                    type="button"
+                    onClick={() => setLightboxIndex(index)}
+                    className="block w-full rounded-2xl overflow-hidden group focus-visible:outline-2 focus-visible:outline-primary"
+                    aria-label={`Ampliar imagem ${index + 1} da galeria`}
+                  >
+                    <img
+                      src={url}
+                      alt=""
+                      className="w-full h-auto object-cover group-hover:opacity-90 transition-opacity duration-300"
+                    />
+                  </button>
+                ))}
               </div>
+
+              {/* Descrição */}
+              {project.description && (
+                <p className="text-white/70 leading-relaxed whitespace-pre-wrap">{project.description}</p>
+              )}
             </div>
           )}
         </div>
+
+        {!loading && !notFound && (
+          <DesktopSidebar
+            project={project}
+            isOwner={isOwner}
+            isReal={isReal}
+            liked={liked}
+            likeCount={likeCount}
+            onLikeToggle={handleLikeToggle}
+            isFollowing={isFollowing}
+            followLoading={followLoading}
+            onFollowToggle={handleFollowToggle}
+            copied={copied}
+            onCopyLink={handleCopyLink}
+            onShare={handleShare}
+            editHref={editHref}
+          />
+        )}
       </div>
 
       {lightboxIndex !== null && gallery.length > 0 && (
