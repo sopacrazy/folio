@@ -3,6 +3,8 @@ import { useParams, useLocation, useNavigate, Link } from 'react-router';
 import { Check, Copy, Eye, Heart, Pencil, Share2, UserCheck, UserPlus, X } from 'lucide-react';
 import { getProjectByUsernameAndSlug, incrementProjectViewCount } from '../mockData';
 import { useAuthStore } from '../store/auth';
+import { getVideoEmbedUrl } from '../lib/video';
+import type { ProjectBlock } from '../types/project';
 import Lightbox from './Lightbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -421,7 +423,14 @@ export default function ProjectModal() {
   const isOwner = currentUser?.id === project?.ownerId;
   const isReal = source === 'real';
   const editHref = `/@${username}/${slug}/editar`;
+  // Projetos reais são montados com blocos; os dados mock (demonstração) ainda
+  // usam o formato antigo (galeria + descrição) — os dois são suportados aqui.
+  const blocks: ProjectBlock[] = project?.blocks ?? [];
+  const hasBlocks = blocks.length > 0;
   const gallery: string[] = project?.gallery ?? [];
+  const flatImages: string[] = hasBlocks
+    ? blocks.flatMap((b) => (b.type === 'image' ? [b.url] : b.type === 'grid' ? b.images : []))
+    : gallery;
   const notFound = !loading && (!project || (!project.isPublic && !isOwner));
 
   return (
@@ -480,21 +489,32 @@ export default function ProjectModal() {
                 editHref={editHref}
               />
 
-              {/* Título */}
-              <h1 className="text-2xl font-semibold text-white mb-3">{project.title}</h1>
-
-              <Link to={`/@${project.user.username}`} className="inline-flex items-center gap-2 mb-4 group">
-                <Avatar className="w-7 h-7 shrink-0">
-                  <AvatarImage src={project.user.avatarUrl} alt={project.user.fullName} />
-                  <AvatarFallback className="text-xs">{project.user.fullName.charAt(0)}</AvatarFallback>
-                </Avatar>
-                <span className="text-sm font-medium text-white/80 group-hover:text-white transition-colors">
-                  {project.user.fullName}
-                </span>
-                <span className="text-sm text-white/40">
-                  · publicado em {new Date(project.createdAt).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}
-                </span>
-              </Link>
+              {/* Título — a capa entra só como miniatura aqui; quem "abre pra
+                  visualizar" (lightbox) é a galeria, não ela. */}
+              <div className="flex items-start gap-4 mb-4">
+                <div className="w-16 h-16 rounded-xl bg-white/5 overflow-hidden shrink-0 flex items-center justify-center">
+                  <img
+                    src={project.coverImageUrl}
+                    alt=""
+                    className="max-w-full max-h-full object-contain"
+                  />
+                </div>
+                <div className="min-w-0 pt-0.5">
+                  <h1 className="text-2xl font-semibold text-white mb-2">{project.title}</h1>
+                  <Link to={`/@${project.user.username}`} className="inline-flex items-center gap-2 group">
+                    <Avatar className="w-6 h-6 shrink-0">
+                      <AvatarImage src={project.user.avatarUrl} alt={project.user.fullName} />
+                      <AvatarFallback className="text-xs">{project.user.fullName.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm font-medium text-white/80 group-hover:text-white transition-colors">
+                      {project.user.fullName}
+                    </span>
+                    <span className="text-sm text-white/40">
+                      · publicado em {new Date(project.createdAt).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}
+                    </span>
+                  </Link>
+                </div>
+              </div>
 
               {/* Tags */}
               {project.tags?.length > 0 && (
@@ -505,34 +525,118 @@ export default function ProjectModal() {
                 </div>
               )}
 
-              {/* Imagens do projeto — capa + galeria, uma abaixo da outra, no
-                  tamanho padrão da coluna (como no Behance). */}
-              <div className="space-y-4 mb-8">
-                <img
-                  src={project.coverImageUrl}
-                  alt={project.title}
-                  className="w-full h-auto rounded-2xl"
-                />
-                {gallery.map((url, index) => (
-                  <button
-                    key={url + index}
-                    type="button"
-                    onClick={() => setLightboxIndex(index)}
-                    className="block w-full rounded-2xl overflow-hidden group focus-visible:outline-2 focus-visible:outline-primary"
-                    aria-label={`Ampliar imagem ${index + 1} da galeria`}
-                  >
-                    <img
-                      src={url}
-                      alt=""
-                      className="w-full h-auto object-cover group-hover:opacity-90 transition-opacity duration-300"
-                    />
-                  </button>
-                ))}
-              </div>
+              {/* Conteúdo do projeto — blocos (imagem, grade, texto, vídeo) na
+                  ordem em que o dono os montou, cada imagem abrindo no
+                  lightbox ao clicar. Dados mock caem no formato antigo
+                  (galeria + descrição) abaixo. */}
+              {hasBlocks ? (
+                <div className="space-y-4">
+                  {(() => {
+                    let imgIndex = -1;
+                    return blocks.map((block) => {
+                      if (block.type === 'image') {
+                        if (!block.url) return null;
+                        imgIndex += 1;
+                        const index = imgIndex;
+                        return (
+                          <button
+                            key={block.id}
+                            type="button"
+                            onClick={() => setLightboxIndex(index)}
+                            className="block w-full rounded-2xl overflow-hidden group focus-visible:outline-2 focus-visible:outline-primary"
+                            aria-label="Ampliar imagem"
+                          >
+                            <img
+                              src={block.url}
+                              alt=""
+                              className="w-full h-auto object-cover group-hover:opacity-90 transition-opacity duration-300"
+                            />
+                          </button>
+                        );
+                      }
 
-              {/* Descrição */}
-              {project.description && (
-                <p className="text-white/70 leading-relaxed whitespace-pre-wrap">{project.description}</p>
+                      if (block.type === 'grid') {
+                        if (block.images.length === 0) return null;
+                        return (
+                          <div key={block.id} className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            {block.images.map((url) => {
+                              imgIndex += 1;
+                              const index = imgIndex;
+                              return (
+                                <button
+                                  key={url + index}
+                                  type="button"
+                                  onClick={() => setLightboxIndex(index)}
+                                  className="block aspect-square rounded-xl overflow-hidden group focus-visible:outline-2 focus-visible:outline-primary"
+                                  aria-label="Ampliar imagem"
+                                >
+                                  <img
+                                    src={url}
+                                    alt=""
+                                    className="w-full h-full object-cover group-hover:opacity-90 transition-opacity duration-300"
+                                  />
+                                </button>
+                              );
+                            })}
+                          </div>
+                        );
+                      }
+
+                      if (block.type === 'text') {
+                        if (!block.content) return null;
+                        return (
+                          <p key={block.id} className="text-white/70 leading-relaxed whitespace-pre-wrap">
+                            {block.content}
+                          </p>
+                        );
+                      }
+
+                      if (block.type === 'video') {
+                        const embedUrl = getVideoEmbedUrl(block.url);
+                        if (!embedUrl) return null;
+                        return (
+                          <div key={block.id} className="aspect-video rounded-2xl overflow-hidden bg-black">
+                            <iframe
+                              src={embedUrl}
+                              className="w-full h-full"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                              title="Vídeo do projeto"
+                            />
+                          </div>
+                        );
+                      }
+
+                      return null;
+                    });
+                  })()}
+                </div>
+              ) : (
+                <>
+                  {gallery.length > 0 && (
+                    <div className="space-y-4 mb-8">
+                      {gallery.map((url, index) => (
+                        <button
+                          key={url + index}
+                          type="button"
+                          onClick={() => setLightboxIndex(index)}
+                          className="block w-full rounded-2xl overflow-hidden group focus-visible:outline-2 focus-visible:outline-primary"
+                          aria-label={`Ampliar imagem ${index + 1} da galeria`}
+                        >
+                          <img
+                            src={url}
+                            alt=""
+                            className="w-full h-auto object-cover group-hover:opacity-90 transition-opacity duration-300"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {project.description && (
+                    <p className="text-white/70 leading-relaxed whitespace-pre-wrap">{project.description}</p>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -557,8 +661,8 @@ export default function ProjectModal() {
         )}
       </div>
 
-      {lightboxIndex !== null && gallery.length > 0 && (
-        <Lightbox images={gallery} initialIndex={lightboxIndex} onClose={() => setLightboxIndex(null)} />
+      {lightboxIndex !== null && flatImages.length > 0 && (
+        <Lightbox images={flatImages} initialIndex={lightboxIndex} onClose={() => setLightboxIndex(null)} />
       )}
     </div>
   );

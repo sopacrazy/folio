@@ -627,7 +627,7 @@ router.post('/projects/:id/view', async (req, res) => {
 
 router.post('/projects', authenticate, async (req: any, res) => {
   try {
-    const { title, slug, description, tags, coverImageUrl, gallery, isPublic } = req.body ?? {};
+    const { title, slug, blocks, tags, coverImageUrl, isPublic } = req.body ?? {};
     if (!title?.trim()) return res.status(400).json({ error: 'Dê um título ao projeto.' });
     if (!coverImageUrl) return res.status(400).json({ error: 'Adicione uma imagem de capa.' });
 
@@ -640,10 +640,9 @@ router.post('/projects', authenticate, async (req: any, res) => {
       ownerId: req.user.id,
       title,
       slug: finalSlug,
-      description: description ?? '',
+      blocks: blocks ?? [],
       coverImageUrl,
       tags: tags ?? [],
-      gallery: gallery ?? [],
       isPublic: Boolean(isPublic),
       feedKey: isPublic ? 'PUBLIC' : undefined,
       viewCount: 0,
@@ -672,7 +671,7 @@ router.put('/projects/:id', authenticate, async (req: any, res) => {
       return res.status(403).json({ error: 'Você não tem permissão para editar esse projeto.' });
     }
 
-    const { title, slug, description, tags, coverImageUrl, gallery, isPublic } = req.body ?? {};
+    const { title, slug, blocks, tags, coverImageUrl, isPublic } = req.body ?? {};
     if (!title?.trim()) return res.status(400).json({ error: 'Dê um título ao projeto.' });
     if (!coverImageUrl) return res.status(400).json({ error: 'Adicione uma imagem de capa.' });
 
@@ -685,10 +684,9 @@ router.put('/projects/:id', authenticate, async (req: any, res) => {
       ...current.Item,
       title,
       slug: finalSlug,
-      description: description ?? '',
+      blocks: blocks ?? [],
       coverImageUrl,
       tags: tags ?? [],
-      gallery: gallery ?? [],
       isPublic: Boolean(isPublic),
       feedKey: isPublic ? 'PUBLIC' : undefined,
       updatedAt: new Date().toISOString(),
