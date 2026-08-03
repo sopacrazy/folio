@@ -11,7 +11,7 @@ const columns = [
     ],
   },
   {
-    title: 'Folio',
+    title: 'Portsy',
     links: [
       { label: 'Sobre', to: null },
       { label: 'Blog', to: null },
@@ -34,7 +34,7 @@ export default function Footer() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-8">
           <div className="col-span-2 sm:col-span-1">
             <Link to="/" className="flex items-center gap-2 text-lg font-bold text-white w-fit">
-              <Heart className="w-4 h-4 fill-primary text-primary" /> Folio
+              <Heart className="w-4 h-4 fill-primary text-primary" /> Portsy
             </Link>
             <p className="text-sm mt-2 max-w-[22ch]">A rede social de portfólios para criadores.</p>
           </div>
@@ -73,7 +73,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-gray-800 mt-8 pt-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
-          <span>© {new Date().getFullYear()} Folio. Todos os direitos reservados.</span>
+          <span>© {new Date().getFullYear()} Portsy. Todos os direitos reservados.</span>
           <div className="flex items-center gap-4">
             <span className="cursor-default select-none hover:text-white transition-colors">Termos</span>
             <span className="cursor-default select-none hover:text-white transition-colors">Privacidade</span>

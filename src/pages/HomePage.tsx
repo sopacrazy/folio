@@ -68,7 +68,7 @@ function DiscoveryHome({ token }: { token: string | null }) {
               Descubra portfólios criativos que inspiram.
             </h1>
             <p className="text-lg text-muted-foreground mt-6 max-w-xl">
-              Folio é o lar de artistas, designers e criadores. Explore trabalhos originais e apoie quem está por trás deles.
+              Portsy é o lar de artistas, designers e criadores. Explore trabalhos originais e apoie quem está por trás deles.
             </p>
             <div className="mt-8">
               <Button asChild size="lg">

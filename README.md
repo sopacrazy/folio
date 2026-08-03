@@ -1,4 +1,4 @@
-# Estrutura Proposta do Projeto: PortfolioHub
+# Estrutura Proposta do Projeto: Portsy
 
 Seguindo suas diretrizes, estruturei as bases do projeto dividindo a stack logicamente em um monorepo para facilitar o desenvolvimento.
 

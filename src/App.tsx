@@ -48,7 +48,7 @@ function Navbar() {
         <div className="flex items-center justify-between h-16 gap-4">
           <div className="flex items-center gap-8 min-w-0">
             <Link to="/" className="font-bold text-xl tracking-tight text-primary shrink-0">
-              Folio
+              Portsy
             </Link>
             <div className="hidden lg:flex items-center gap-6">
               <NavLink to="/" end className={navLinkClass}>Início</NavLink>

@@ -291,7 +291,7 @@ export default function ProjectFormPage() {
           <div>
             <label className="block text-sm font-bold text-foreground mb-2">Endereço do projeto</label>
             <div className="flex items-center rounded-xl border border-input bg-background shadow-sm focus-within:ring-2 focus-within:ring-ring overflow-hidden">
-              <span className="pl-4 text-sm text-muted-foreground shrink-0">folio.app/@{user.username}/</span>
+              <span className="pl-4 text-sm text-muted-foreground shrink-0">portsy.app/@{user.username}/</span>
               <input
                 value={slugValue}
                 onChange={(e) => { setSlugTouched(true); setSlugValue(slugify(e.target.value)); }}

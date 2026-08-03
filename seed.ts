@@ -122,8 +122,8 @@ async function seed() {
     {
       id: uuidv4(),
       userId: adminId,
-      title: 'PortfolioHub Plataforma',
-      description: 'A própria plataforma PortfolioHub desenvolvida para conectar criadores.',
+      title: 'Portsy Plataforma',
+      description: 'A própria plataforma Portsy desenvolvida para conectar criadores.',
       category: 'Dev',
       coverUrl: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?q=80&w=1200&auto=format&fit=crop',
       tools: JSON.stringify(['React', 'Node.js', 'Express']),
