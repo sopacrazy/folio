@@ -389,7 +389,7 @@ export default function ProjectFormPage() {
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="mx-auto w-full max-w-[1880px] px-5 py-12 lg:px-8">
         <Card className="p-8 md:p-12">
           <Skeleton className="h-8 w-48 mb-8" />
           <Skeleton className="w-full aspect-[21/9] md:aspect-[3/1] rounded-2xl mb-8" />

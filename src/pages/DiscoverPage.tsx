@@ -66,7 +66,7 @@ export default function DiscoverPage() {
     <div className="min-h-screen">
       {/* Categorias (sticky) */}
       <div className="sticky top-16 z-40 bg-white/95 backdrop-blur border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-[1880px] px-5 lg:px-8">
           <div className="flex gap-6 overflow-x-auto no-scrollbar">
             {categories.map((cat) => (
               <button
@@ -87,7 +87,7 @@ export default function DiscoverPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className="mx-auto w-full max-w-[1880px] px-5 py-10 lg:px-8">
         {query && (
           <p className="text-sm text-muted-foreground mb-6">
             Resultados para <span className="font-semibold text-foreground">"{searchParams.get('q')}"</span>
@@ -98,7 +98,7 @@ export default function DiscoverPage() {
         {query && !creatorsLoading && creatorMatches.length > 0 && (
           <section className="mb-10">
             <h2 className="text-lg font-bold text-foreground mb-4">Criadores</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
               {creatorMatches.map((creator) => (
                 <CreatorCard
                   key={creator.id}
@@ -120,7 +120,7 @@ export default function DiscoverPage() {
         )}
 
         {loading ? (
-          <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-6">
+          <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5 gap-6">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div
                 key={i}
@@ -130,7 +130,7 @@ export default function DiscoverPage() {
             ))}
           </div>
         ) : (
-          <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-6">
+          <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5 gap-6">
             {filteredProjects.map((project: any) => (
               <div key={project.id} className="mb-6 break-inside-avoid">
                 <ProjectCard project={project} />
