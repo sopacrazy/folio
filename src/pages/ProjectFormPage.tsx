@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { slugify } from '../mockData';
-import { uploadFile } from '../lib/upload';
+import { uploadFile, type UploadStatus } from '../lib/upload';
 import { getVideoEmbedUrl } from '../lib/video';
 import type { ProjectBlock, ProjectBlockType } from '../types/project';
 import { Badge } from '@/components/ui/badge';
@@ -29,8 +29,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
-
 const BLOCK_META: Record<ProjectBlockType, { label: string; icon: typeof ImageIcon }> = {
   image: { label: 'Imagem', icon: ImageIcon },
   grid: { label: 'Grade de fotos', icon: LayoutGrid },
@@ -38,7 +36,7 @@ const BLOCK_META: Record<ProjectBlockType, { label: string; icon: typeof ImageIc
   video: { label: 'Vídeo', icon: VideoIcon },
 };
 
-type PendingUpload = { id: string; previewUrl: string };
+type PendingUpload = { id: string; previewUrl: string; status: UploadStatus };
 
 function AddContentButton({ type, onClick }: { type: ProjectBlockType; onClick: () => void }) {
   const { label, icon: Icon } = BLOCK_META[type];
@@ -137,11 +135,13 @@ function BlockShell({ type, isDragOver, onRemove, onDragStart, onDragEnd, onDrag
 function ImageBlockEditor({
   url,
   uploading,
+  uploadStatus,
   previewUrl,
   onFile,
 }: {
   url: string;
   uploading: boolean;
+  uploadStatus?: UploadStatus;
   previewUrl?: string;
   onFile: (file: File) => void;
 }) {
@@ -175,8 +175,11 @@ function ImageBlockEditor({
           </div>
         )}
         {uploading && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-            <Loader2 className="w-7 h-7 text-white animate-spin" />
+          <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2 text-white">
+            <Loader2 className="w-7 h-7 animate-spin" />
+            <span className="text-sm font-medium">
+              {uploadStatus === 'optimizing' ? 'Otimizando imagem...' : 'Enviando imagem...'}
+            </span>
           </div>
         )}
       </div>
@@ -229,7 +232,12 @@ function GridBlockEditor({
           <div key={p.id} className="relative aspect-square rounded-lg overflow-hidden border border-border">
             <img src={p.previewUrl} alt="" className="w-full h-full object-cover opacity-60" />
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-              <Loader2 className="w-5 h-5 text-white animate-spin" />
+              <div className="flex flex-col items-center gap-1.5 text-white">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span className="text-[11px] font-medium text-center px-2">
+                  {p.status === 'optimizing' ? 'Otimizando...' : 'Enviando...'}
+                </span>
+              </div>
             </div>
           </div>
         ))}
@@ -312,6 +320,7 @@ export default function ProjectFormPage() {
   const [coverImageUrl, setCoverImageUrl] = useState('');
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [coverUploading, setCoverUploading] = useState(false);
+  const [coverUploadStatus, setCoverUploadStatus] = useState<UploadStatus | null>(null);
   const [isPublic, setIsPublic] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [fileError, setFileError] = useState('');
@@ -409,10 +418,6 @@ export default function ProjectFormPage() {
       setFileError('Formato inválido. Use JPG, PNG ou WEBP.');
       return false;
     }
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      setFileError('O arquivo deve ter no máximo 5MB.');
-      return false;
-    }
     setFileError('');
     return true;
   };
@@ -422,13 +427,15 @@ export default function ProjectFormPage() {
     const localPreview = URL.createObjectURL(file);
     setCoverPreview(localPreview);
     setCoverUploading(true);
+    setCoverUploadStatus('optimizing');
     try {
-      const url = await uploadFile(file, token, 'projects');
+      const url = await uploadFile(file, token, 'projects', setCoverUploadStatus);
       setCoverImageUrl(url);
     } catch (err: any) {
       setFileError(err.message || 'Falha ao enviar a imagem.');
     } finally {
       setCoverUploading(false);
+      setCoverUploadStatus(null);
       setCoverPreview(null);
       URL.revokeObjectURL(localPreview);
     }
@@ -491,9 +498,14 @@ export default function ProjectFormPage() {
 
   const uploadIntoImageBlock = (blockId: string, file: File) => {
     if (!validateFile(file)) return;
-    const pending: PendingUpload = { id: crypto.randomUUID(), previewUrl: URL.createObjectURL(file) };
+    const pending: PendingUpload = { id: crypto.randomUUID(), previewUrl: URL.createObjectURL(file), status: 'optimizing' };
     setBlockUploads((u) => ({ ...u, [blockId]: [pending] }));
-    uploadFile(file, token, 'projects')
+    uploadFile(file, token, 'projects', (status) => {
+      setBlockUploads((u) => ({
+        ...u,
+        [blockId]: (u[blockId] ?? []).map((p) => (p.id === pending.id ? { ...p, status } : p)),
+      }));
+    })
       .then((url) => updateBlock(blockId, { url }))
       .catch((err) => setFileError(err.message || 'Falha ao enviar a imagem.'))
       .finally(() => {
@@ -505,9 +517,14 @@ export default function ProjectFormPage() {
   const uploadIntoGridBlock = (blockId: string, files: File[]) => {
     const validFiles = files.filter(validateFile);
     validFiles.forEach((file) => {
-      const pending: PendingUpload = { id: crypto.randomUUID(), previewUrl: URL.createObjectURL(file) };
+      const pending: PendingUpload = { id: crypto.randomUUID(), previewUrl: URL.createObjectURL(file), status: 'optimizing' };
       setBlockUploads((u) => ({ ...u, [blockId]: [...(u[blockId] ?? []), pending] }));
-      uploadFile(file, token, 'projects')
+      uploadFile(file, token, 'projects', (status) => {
+        setBlockUploads((u) => ({
+          ...u,
+          [blockId]: (u[blockId] ?? []).map((p) => (p.id === pending.id ? { ...p, status } : p)),
+        }));
+      })
         .then((url) => {
           setBlocks((bs) => bs.map((b) => (b.id === blockId && b.type === 'grid' ? { ...b, images: [...b.images, url] } : b)));
         })
@@ -675,8 +692,11 @@ export default function ProjectFormPage() {
                     </div>
                   )}
                   {coverUploading && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                      <Loader2 className="w-8 h-8 text-white animate-spin" />
+                    <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2 text-white">
+                      <Loader2 className="w-8 h-8 animate-spin" />
+                      <span className="text-sm font-medium">
+                        {coverUploadStatus === 'optimizing' ? 'Otimizando imagem...' : 'Enviando imagem...'}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -773,6 +793,7 @@ export default function ProjectFormPage() {
                     <ImageBlockEditor
                       url={block.url}
                       uploading={(blockUploads[block.id]?.length ?? 0) > 0}
+                      uploadStatus={blockUploads[block.id]?.[0]?.status}
                       previewUrl={blockUploads[block.id]?.[0]?.previewUrl}
                       onFile={(file) => uploadIntoImageBlock(block.id, file)}
                     />
@@ -889,8 +910,11 @@ export default function ProjectFormPage() {
                     </div>
                   )}
                   {coverUploading && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                      <Loader2 className="w-8 h-8 text-white animate-spin" />
+                    <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2 text-white">
+                      <Loader2 className="w-8 h-8 animate-spin" />
+                      <span className="text-sm font-medium">
+                        {coverUploadStatus === 'optimizing' ? 'Otimizando imagem...' : 'Enviando imagem...'}
+                      </span>
                     </div>
                   )}
                 </div>

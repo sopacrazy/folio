@@ -5,7 +5,11 @@ interface User {
   username: string;
   email: string;
   fullName: string;
+  bio?: string;
   avatarUrl?: string;
+  coverUrl?: string;
+  onboardingCompleted?: boolean;
+  onboardingStep?: number;
 }
 
 interface AuthState {

@@ -34,8 +34,12 @@ export default function LoginPage({ isRegister = false }: { isRegister?: boolean
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Ocorreu um erro.');
 
-      login(data.token, data.user);
-      navigate('/');
+      const nextUser = isRegister
+        ? { ...data.user, onboardingCompleted: false, onboardingStep: data.user?.onboardingStep ?? 1 }
+        : data.user;
+
+      login(data.token, nextUser);
+      navigate(isRegister || nextUser?.onboardingCompleted === false ? '/onboarding' : '/');
     } catch (err: any) {
       setError(err.message);
     }

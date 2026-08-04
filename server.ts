@@ -10,7 +10,7 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(cors());
-  app.use(express.json());
+  app.use(express.json({ limit: '1mb' }));
 
   // Setup local uploads folder for MVP (as requested)
   const uploadsDir = path.join(process.cwd(), 'uploads');

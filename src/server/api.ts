@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
-import path from 'path';
+import sharp from 'sharp';
 import { v4 as uuidv4 } from 'uuid';
 import { DeleteCommand, GetCommand, PutCommand, QueryCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
@@ -42,7 +42,20 @@ const optionalAuthenticate = (req: any, _res: any, next: any) => {
 };
 
 // Multer guarda o arquivo em memória (buffer) — vai direto pro S3, nunca toca o disco.
-const upload = multer({ storage: multer.memoryStorage() });
+const MAX_UPLOAD_INPUT_BYTES = 15 * 1024 * 1024;
+const ACCEPTED_IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_UPLOAD_INPUT_BYTES },
+  fileFilter: (_req, file, cb) => {
+    if (!ACCEPTED_IMAGE_MIME_TYPES.has(file.mimetype)) {
+      cb(new Error('Formato inválido. Use JPG, PNG ou WEBP.'));
+      return;
+    }
+    cb(null, true);
+  },
+});
 
 // -- HELPERS COMPARTILHADOS (DynamoDB) --
 
@@ -70,8 +83,18 @@ async function findUserByEmail(email: string) {
 
 /** Inclui o e-mail de cadastro — só para respostas privadas (o próprio usuário vendo seus dados). */
 function toPrivateUser(user: Record<string, any>) {
-  const { id, username, email, fullName, avatarUrl } = user;
-  return { id, username, email, fullName, avatarUrl };
+  const { id, username, email, fullName, avatarUrl, bio, coverUrl } = user;
+  return {
+    id,
+    username,
+    email,
+    fullName,
+    bio: bio ?? '',
+    avatarUrl,
+    coverUrl: coverUrl ?? '',
+    onboardingCompleted: user.onboarding_completed ?? true,
+    onboardingStep: user.onboarding_step ?? 1,
+  };
 }
 
 /** Sem o e-mail de cadastro — para respostas públicas (perfil visitado, autor de projeto). */
@@ -198,12 +221,16 @@ async function isFollowingUser(followerId: string | undefined, followingId: stri
 router.post('/auth/register', async (req, res) => {
   try {
     const { username, email, password, fullName } = req.body ?? {};
-    if (!username || !email || !password || !fullName) {
+    const finalUsername = normalizeUsername(username ?? '');
+    if (!finalUsername || !email || !password || !fullName) {
       return res.status(400).json({ error: 'Preencha nome, usuário, e-mail e senha.' });
+    }
+    if (!isValidUsername(finalUsername)) {
+      return res.status(400).json({ error: 'Use um nome de usuário com 3 a 24 letras, números ou underline.' });
     }
 
     const [byUsername, byEmail] = await Promise.all([
-      findUserByUsername(username),
+      findUserByUsername(finalUsername),
       findUserByEmail(email),
     ]);
     if (byUsername) return res.status(400).json({ error: 'Esse nome de usuário já está em uso.' });
@@ -212,8 +239,16 @@ router.post('/auth/register', async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 10);
     const id = uuidv4();
     const user = {
-      id, username, email, passwordHash, fullName,
-      followers: 0, skills: [], createdAt: new Date().toISOString(),
+      id,
+      username: finalUsername,
+      email,
+      passwordHash,
+      fullName,
+      followers: 0,
+      skills: [],
+      onboarding_completed: false,
+      onboarding_step: 1,
+      createdAt: new Date().toISOString(),
     };
 
     await ddb.send(new PutCommand({
@@ -222,9 +257,10 @@ router.post('/auth/register', async (req, res) => {
       ConditionExpression: 'attribute_not_exists(id)',
     }));
 
-    const token = jwt.sign({ id, username }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id, username: finalUsername }, JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, user: toPrivateUser(user) });
   } catch (error: any) {
+    console.error('Erro ao cadastrar usuário:', error);
     res.status(400).json({ error: error.message });
   }
 });
@@ -258,6 +294,81 @@ router.get('/auth/me', authenticate, async (req: any, res) => {
     res.json(toPrivateUser(result.Item));
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// -- ONBOARDING --
+
+router.get('/users/check-username', authenticate, async (req: any, res) => {
+  try {
+    const username = normalizeUsername((req.query.username as string) ?? '');
+    if (!isValidUsername(username)) {
+      return res.json({ available: false, reason: 'Use 3 a 24 letras, números ou underline.' });
+    }
+
+    const existing = await findUserByUsername(username);
+    res.json({ available: !existing || existing.id === req.user.id });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Não foi possível verificar o nome de usuário.' });
+  }
+});
+
+router.put('/onboarding', authenticate, async (req: any, res) => {
+  try {
+    const current = await ddb.send(new GetCommand({ TableName: TABLES.users, Key: { id: req.user.id } }));
+    if (!current.Item) return res.status(404).json({ error: 'Usuário não encontrado.' });
+
+    const {
+      fullName,
+      username,
+      bio,
+      avatarUrl,
+      coverUrl,
+      onboardingStep,
+      onboardingCompleted,
+    } = req.body ?? {};
+
+    const updated: Record<string, any> = { ...current.Item };
+
+    if (fullName !== undefined) {
+      if (!String(fullName).trim()) return res.status(400).json({ error: 'Informe seu nome completo.' });
+      updated.fullName = String(fullName).trim();
+    }
+
+    if (username !== undefined) {
+      const finalUsername = normalizeUsername(username);
+      if (!isValidUsername(finalUsername)) {
+        return res.status(400).json({ error: 'Use um nome de usuário com 3 a 24 letras, números ou underline.' });
+      }
+      if (finalUsername !== current.Item.username) {
+        const existing = await findUserByUsername(finalUsername);
+        if (existing && existing.id !== req.user.id) {
+          return res.status(400).json({ error: 'Esse nome de usuário já está em uso.' });
+        }
+      }
+      updated.username = finalUsername;
+    }
+
+    if (bio !== undefined) updated.bio = String(bio ?? '').slice(0, 180);
+    if (avatarUrl !== undefined) updated.avatarUrl = String(avatarUrl ?? '');
+    if (coverUrl !== undefined) updated.coverUrl = String(coverUrl ?? '');
+    if (onboardingStep !== undefined) {
+      updated.onboarding_step = Math.min(Math.max(Number(onboardingStep) || 1, 1), 4);
+    }
+    if (onboardingCompleted !== undefined) {
+      if (onboardingCompleted && (!updated.fullName || !updated.username || !updated.avatarUrl || !updated.coverUrl)) {
+        return res.status(400).json({ error: 'Complete perfil, avatar e capa antes de finalizar.' });
+      }
+      updated.onboarding_completed = Boolean(onboardingCompleted);
+      if (updated.onboarding_completed) updated.onboarding_step = 4;
+    }
+
+    await ddb.send(new PutCommand({ TableName: TABLES.users, Item: updated }));
+    const token = jwt.sign({ id: updated.id, username: updated.username }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ token, user: toPrivateUser(updated) });
+  } catch (error: any) {
+    console.error('Erro ao salvar onboarding:', error);
+    return res.status(500).json({ error: 'Não foi possível salvar seu progresso agora. Verifique sua conexão e tente novamente.' });
   }
 });
 
@@ -764,23 +875,67 @@ router.delete('/projects/:id/like', authenticate, async (req: any, res) => {
 // Nome do objeto: uuid + extensão original — evita colisão e não expõe o nome
 // de arquivo que o usuário mandou. `folder` vem do form-data do cliente, mas
 // é validado contra uma lista fixa antes de virar parte da key do S3.
-router.post('/upload', authenticate, upload.single('file'), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+async function optimizeUploadedImage(file: Express.Multer.File, folder: 'avatars' | 'projects', purpose?: string) {
+  const maxDimension = purpose === 'profile-cover' ? 1500 : folder === 'avatars' ? 500 : 2000;
+  const buffer = await sharp(file.buffer)
+    .rotate()
+    .resize({
+      width: maxDimension,
+      height: maxDimension,
+      fit: 'inside',
+      withoutEnlargement: true,
+    })
+    .jpeg({ quality: 85, mozjpeg: true })
+    .toBuffer();
+
+  return {
+    buffer,
+    contentType: 'image/jpeg',
+    extension: '.jpg',
+  };
+}
+
+function normalizeUsername(value: string) {
+  return value.trim().replace(/^@+/, '').toLowerCase();
+}
+
+function isValidUsername(value: string) {
+  return /^[a-z0-9_]{3,24}$/.test(value);
+}
+
+function uploadSingleImage(req: any, res: any, next: any) {
+  upload.single('file')(req, res, (error: any) => {
+    if (!error) {
+      next();
+      return;
+    }
+
+    if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+      res.status(413).json({ error: 'Imagem muito grande. Envie uma imagem de até 15MB.' });
+      return;
+    }
+
+    res.status(400).json({ error: error.message || 'Não foi possível receber a imagem.' });
+  });
+}
+
+router.post('/upload', authenticate, uploadSingleImage, async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Envie uma imagem para continuar.' });
   try {
     const folder = req.body.folder === 'avatars' ? 'avatars' : 'projects';
-    const ext = path.extname(req.file.originalname);
-    const key = `${folder}/${uuidv4()}${ext}`;
+    const optimized = await optimizeUploadedImage(req.file, folder, req.body.purpose);
+    const key = `${folder}/${uuidv4()}${optimized.extension}`;
 
     await s3.send(new PutObjectCommand({
       Bucket: S3_BUCKET,
       Key: key,
-      Body: req.file.buffer,
-      ContentType: req.file.mimetype,
+      Body: optimized.buffer,
+      ContentType: optimized.contentType,
     }));
 
     res.json({ url: s3PublicUrl(key) });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch {
+    res.status(500).json({ error: 'Não foi possível otimizar e enviar a imagem. Tente novamente.' });
   }
 });
 

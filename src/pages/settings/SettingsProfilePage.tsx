@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuthStore } from '../../store/auth';
-import { uploadFile } from '../../lib/upload';
+import { uploadFile, type UploadStatus } from '../../lib/upload';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -21,7 +21,6 @@ interface ProfileFormData {
 }
 
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
 const emptyForm: ProfileFormData = {
   fullName: '',
@@ -41,6 +40,7 @@ export default function SettingsProfilePage() {
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [fileError, setFileError] = useState('');
+  const [imageUploadStatus, setImageUploadStatus] = useState<UploadStatus | null>(null);
 
   const coverInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -84,10 +84,6 @@ export default function SettingsProfilePage() {
       setFileError('Formato inválido. Use JPG, PNG ou WEBP.');
       return false;
     }
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      setFileError('O arquivo deve ter no máximo 5MB.');
-      return false;
-    }
     setFileError('');
     return true;
   };
@@ -120,13 +116,16 @@ export default function SettingsProfilePage() {
     e.target.value = '';
     if (!file || !validateFile(file)) return;
     try {
-      const url = await uploadFile(file, token, 'avatars');
+      setImageUploadStatus('optimizing');
+      const url = await uploadFile(file, token, 'projects', setImageUploadStatus, { maxDimension: 1500, purpose: 'profile-cover' });
       const next = { ...form, coverUrl: url };
       setForm(next);
       await saveProfile(next);
       setFeedback({ type: 'success', message: 'Capa atualizada.' });
     } catch (err: any) {
       setFileError(err.message || 'Falha ao enviar a imagem.');
+    } finally {
+      setImageUploadStatus(null);
     }
   };
 
@@ -135,13 +134,16 @@ export default function SettingsProfilePage() {
     e.target.value = '';
     if (!file || !validateFile(file)) return;
     try {
-      const url = await uploadFile(file, token, 'avatars');
+      setImageUploadStatus('optimizing');
+      const url = await uploadFile(file, token, 'avatars', setImageUploadStatus);
       const next = { ...form, avatarUrl: url };
       setForm(next);
       await saveProfile(next);
       setFeedback({ type: 'success', message: 'Foto de perfil atualizada.' });
     } catch (err: any) {
       setFileError(err.message || 'Falha ao enviar a imagem.');
+    } finally {
+      setImageUploadStatus(null);
     }
   };
 
@@ -207,6 +209,11 @@ export default function SettingsProfilePage() {
           </div>
         )}
         {fileError && <div className="text-sm rounded-xl p-4 mb-6 font-medium bg-red-50 text-red-700">{fileError}</div>}
+        {imageUploadStatus && (
+          <div className="text-sm rounded-xl p-4 mb-6 font-medium bg-primary/10 text-primary">
+            {imageUploadStatus === 'optimizing' ? 'Otimizando imagem...' : 'Enviando imagem...'}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Cover */}

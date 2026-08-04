@@ -21,6 +21,7 @@ import CreatorsPage from './pages/CreatorsPage';
 import ProfilePage from './pages/ProfilePage';
 import ProjectFormPage from './pages/ProjectFormPage';
 import LoginPage from './pages/LoginPage';
+import OnboardingPage from './pages/OnboardingPage';
 import SettingsLayout from './pages/settings/SettingsLayout';
 import SettingsProfilePage from './pages/settings/SettingsProfilePage';
 import SettingsAccountPage from './pages/settings/SettingsAccountPage';
@@ -176,27 +177,62 @@ function Navbar() {
   );
 }
 
+function OnboardingNavbar() {
+  return (
+    <nav className="sticky top-0 z-50 bg-white border-b border-gray-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+          <span className="font-bold text-xl tracking-tight text-primary select-none">
+            Portsy
+          </span>
+          <span className="text-sm font-semibold text-muted-foreground">
+            Configuração inicial
+          </span>
+        </div>
+      </div>
+    </nav>
+  );
+}
+
 export default function App() {
   const location = useLocation();
+  const { user } = useAuthStore();
   const state = location.state as { backgroundLocation?: Location } | null;
+  const hasRequiredOnboardingFields = Boolean(user?.fullName && user?.username && user?.avatarUrl && user?.coverUrl);
+  const isOnboardingRoute = location.pathname === '/onboarding';
+  const isOnboardingLocked = Boolean(user && (user.onboardingCompleted === false || !hasRequiredOnboardingFields));
+  const mustCompleteOnboarding = Boolean(
+    user &&
+    !isOnboardingRoute &&
+    isOnboardingLocked
+  );
 
   // Acesso direto a /@usuario/slug (sem vir navegando de dentro do app — refresh,
   // link compartilhado): não existe um "fundo" real pra mostrar, então forçamos a
   // Home como pano de fundo genérico e ainda assim abrimos o modal por cima dela.
-  const isDirectProjectAccess = !state?.backgroundLocation && matchPath({ path: PROJECT_PATH, end: true }, location.pathname);
+  const directProjectMatch = matchPath({ path: PROJECT_PATH, end: true }, location.pathname);
+  const isDirectProjectAccess = Boolean(
+    !state?.backgroundLocation &&
+    directProjectMatch &&
+    directProjectMatch.params.handle?.startsWith('@')
+  );
   const backgroundLocation: Location | undefined =
     state?.backgroundLocation ?? (isDirectProjectAccess ? { ...location, pathname: '/', search: '', hash: '' } : undefined);
 
   return (
     <div className="min-h-screen bg-muted font-sans text-foreground">
-      <Navbar />
+      {isOnboardingRoute && isOnboardingLocked ? <OnboardingNavbar /> : <Navbar />}
       <main>
+        {mustCompleteOnboarding ? (
+          <Navigate to="/onboarding" replace />
+        ) : (
         <Routes location={backgroundLocation ?? location}>
           <Route path="/" element={<HomePage />} />
           <Route path="/descobrir" element={<DiscoverPage />} />
           <Route path="/criadores" element={<CreatorsPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<LoginPage isRegister />} />
+          <Route path="/onboarding" element={<OnboardingPage />} />
           <Route path="/novo-projeto" element={<ProjectFormPage />} />
           <Route path="/:handle" element={<ProfilePage />} />
           <Route path="/:handle/:slug/editar" element={<ProjectFormPage />} />
@@ -208,8 +244,9 @@ export default function App() {
             <Route path="privacidade" element={<SettingsPlaceholderPage title="Privacidade" />} />
           </Route>
         </Routes>
+        )}
       </main>
-      <Footer />
+      {!(isOnboardingRoute && isOnboardingLocked) && <Footer />}
 
       {/* Camada de modal: só existe quando há um "fundo" definido (navegação in-app
           ou acesso direto forçado pra Home). Usa a location REAL (não a de fundo)
