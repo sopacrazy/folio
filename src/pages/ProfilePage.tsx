@@ -108,7 +108,7 @@ export default function ProfilePage() {
     return (
       <div>
         <Skeleton className="h-36 md:h-40 w-full rounded-none" />
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+        <div className="mx-auto w-full max-w-[1880px] px-5 pb-16 lg:px-8">
           <div className="relative -mt-14 sm:-mt-16 mb-8 flex flex-col md:flex-row gap-6 md:items-end justify-between">
             <div className="flex flex-col md:flex-row gap-5 md:items-end">
               <Skeleton className="w-28 h-28 md:w-32 md:h-32 rounded-full border-4 border-white" />
@@ -120,7 +120,7 @@ export default function ProfilePage() {
             <Skeleton className="h-10 w-32 rounded-full" />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-4 lg:gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-4 lg:gap-6">
             <div className="order-2 lg:order-1">
               <Card>
                 <CardContent className="p-5 space-y-3">
@@ -130,7 +130,7 @@ export default function ProfilePage() {
                 </CardContent>
               </Card>
             </div>
-            <div className="order-1 lg:order-2 min-w-0 columns-1 sm:columns-2 gap-6">
+            <div className="order-1 lg:order-2 min-w-0 columns-1 sm:columns-2 xl:columns-3 2xl:columns-4 gap-6">
               {[1, 2, 3, 4].map((i) => (
                 <Skeleton
                   key={i}
@@ -161,7 +161,7 @@ export default function ProfilePage() {
         )}
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+      <div className="mx-auto w-full max-w-[1880px] px-5 pb-16 lg:px-8">
         {/* Profile Info */}
         <div className="relative -mt-14 sm:-mt-16 mb-8 flex flex-col md:flex-row gap-6 md:items-end justify-between">
           <div className="flex flex-col md:flex-row gap-5 md:items-end">
@@ -223,7 +223,7 @@ export default function ProfilePage() {
           </TabsList>
 
           <TabsContent value="projetos">
-            <div className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-4 lg:gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-4 lg:gap-6">
               {/* Sidebar */}
               <div className="order-2 lg:order-1">
                 <Card>
@@ -271,7 +271,7 @@ export default function ProfilePage() {
               {/* Projects */}
               <div className="order-1 lg:order-2 min-w-0">
                 {visibleProjects.length > 0 ? (
-                  <div className="columns-1 sm:columns-2 gap-6">
+                  <div className="columns-1 sm:columns-2 xl:columns-3 2xl:columns-4 gap-6">
                     {visibleProjects.map((project: any) => (
                       <div key={project.id} className="mb-6 break-inside-avoid">
                         <ProjectCard project={project} />
