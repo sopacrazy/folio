@@ -13,6 +13,9 @@ export interface MockUser {
   coverUrl?: string;
   portfolioLink?: string;
   contactEmail?: string;
+  whatsapp?: string;
+  instagram?: string;
+  facebook?: string;
   createdAt: Date;
   followers: number;
   skills: string[];
@@ -442,21 +445,21 @@ function generateUniqueSlug(ownerId: string, seed: string, excludeProjectId?: st
 }
 
 function userSummary(user: MockUser) {
-  const { id, username, fullName, avatarUrl, email } = user;
-  return { id, username, fullName, avatarUrl, email };
+  const { id, username, fullName, avatarUrl, email, whatsapp, instagram, facebook } = user;
+  return { id, username, fullName, avatarUrl, email, whatsapp, instagram, facebook };
 }
 
 function userWithProfile(user: MockUser) {
   const {
     id, username, fullName, avatarUrl, coverUrl, category, location, bio,
-    followers, skills, badgeSlugs, portfolioLink, contactEmail,
+    followers, skills, badgeSlugs, portfolioLink, contactEmail, whatsapp, instagram, facebook,
   } = user;
   const badges = (badgeSlugs ?? [])
     .map((slug) => mockBadgeCatalog.find((b) => b.slug === slug))
     .filter((b): b is MockBadge => Boolean(b));
   return {
     id, username, fullName, avatarUrl, coverUrl, category, location, bio,
-    followers, skills, badges, portfolioLink, contactEmail,
+    followers, skills, badges, portfolioLink, contactEmail, whatsapp, instagram, facebook,
   };
 }
 
@@ -588,6 +591,9 @@ export function updateUserProfile(userId: string, data: {
   coverUrl: string;
   portfolioLink: string;
   contactEmail: string;
+  whatsapp: string;
+  instagram: string;
+  facebook: string;
 }) {
   const user = mockUsers.find((u) => u.id === userId);
   if (!user) throw new Error('Usuário não encontrado');
@@ -602,6 +608,9 @@ export function updateUserProfile(userId: string, data: {
   user.coverUrl = data.coverUrl;
   user.portfolioLink = data.portfolioLink;
   user.contactEmail = data.contactEmail;
+  user.whatsapp = data.whatsapp;
+  user.instagram = data.instagram;
+  user.facebook = data.facebook;
 
   return userSummary(user);
 }

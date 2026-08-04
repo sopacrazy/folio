@@ -83,7 +83,7 @@ async function findUserByEmail(email: string) {
 
 /** Inclui o e-mail de cadastro — só para respostas privadas (o próprio usuário vendo seus dados). */
 function toPrivateUser(user: Record<string, any>) {
-  const { id, username, email, fullName, avatarUrl, bio, coverUrl } = user;
+  const { id, username, email, fullName, avatarUrl, bio, coverUrl, whatsapp, instagram, facebook } = user;
   return {
     id,
     username,
@@ -92,6 +92,9 @@ function toPrivateUser(user: Record<string, any>) {
     bio: bio ?? '',
     avatarUrl,
     coverUrl: coverUrl ?? '',
+    whatsapp: whatsapp ?? '',
+    instagram: instagram ?? '',
+    facebook: facebook ?? '',
     onboardingCompleted: user.onboarding_completed ?? true,
     onboardingStep: user.onboarding_step ?? 1,
   };
@@ -116,13 +119,14 @@ function toCreatorSummary(user: Record<string, any>) {
 function toProfile(user: Record<string, any>) {
   const {
     id, username, fullName, bio, category, location, createdAt,
-    avatarUrl, coverUrl, portfolioLink, contactEmail, followers, skills,
+    avatarUrl, coverUrl, portfolioLink, contactEmail, whatsapp, instagram, facebook, followers, skills,
   } = user;
   return {
     id, username, fullName,
     bio: bio ?? '', category: category ?? '', location: location ?? '',
     avatarUrl: avatarUrl ?? '', coverUrl: coverUrl ?? '',
-    portfolioLink: portfolioLink ?? '', contactEmail: contactEmail ?? '',
+    portfolioLink: portfolioLink ?? '', contactEmail: contactEmail ?? '', whatsapp: whatsapp ?? '',
+    instagram: instagram ?? '', facebook: facebook ?? '',
     followers: followers ?? 0, skills: skills ?? [], createdAt: createdAt ?? '',
   };
 }
@@ -158,6 +162,18 @@ function slugify(text: string) {
     .replace(/[^a-z0-9\s-]/g, '')
     .replace(/[\s_-]+/g, '-')
     .replace(/^-+|-+$/g, '');
+}
+
+function normalizeWhatsapp(value: unknown) {
+  return String(value ?? '').replace(/\D/g, '').slice(0, 15);
+}
+
+function isValidWhatsapp(value: string) {
+  return !value || (value.length >= 10 && value.length <= 15);
+}
+
+function normalizeSocial(value: unknown) {
+  return String(value ?? '').trim().replace(/^@+/, '').slice(0, 80);
 }
 
 async function getProjectsByOwnerId(ownerId: string) {
@@ -216,6 +232,42 @@ async function isFollowingUser(followerId: string | undefined, followingId: stri
   return Boolean(result.Item);
 }
 
+type NotificationType = 'like' | 'follow' | 'comment' | 'mention';
+
+async function createNotification(input: {
+  userId: string;
+  type: NotificationType;
+  actor: Record<string, any>;
+  targetType: 'project' | 'profile';
+  targetId: string;
+  targetTitle?: string;
+  targetUrl?: string;
+}) {
+  if (!input.userId || input.userId === input.actor.id) return;
+
+  try {
+    await ddb.send(new PutCommand({
+      TableName: TABLES.notifications,
+      Item: {
+        notificationId: uuidv4(),
+        userId: input.userId,
+        type: input.type,
+        actorId: input.actor.id,
+        actorName: input.actor.fullName ?? input.actor.username ?? 'Alguém',
+        actorAvatar: input.actor.avatarUrl ?? '',
+        targetType: input.targetType,
+        targetId: input.targetId,
+        targetTitle: input.targetTitle ?? '',
+        targetUrl: input.targetUrl ?? '',
+        read: false,
+        createdAt: new Date().toISOString(),
+      },
+    }));
+  } catch (error) {
+    console.error('Erro ao criar notificação:', error);
+  }
+}
+
 // -- AUTH --
 
 router.post('/auth/register', async (req, res) => {
@@ -244,6 +296,9 @@ router.post('/auth/register', async (req, res) => {
       email,
       passwordHash,
       fullName,
+      whatsapp: '',
+      instagram: '',
+      facebook: '',
       followers: 0,
       skills: [],
       onboarding_completed: false,
@@ -425,9 +480,14 @@ router.get('/users/:username', optionalAuthenticate, async (req: any, res) => {
 
 router.put('/users/me', authenticate, async (req: any, res) => {
   try {
-    const { fullName, username, bio, avatarUrl, coverUrl, portfolioLink, contactEmail } = req.body ?? {};
+    const { fullName, username, bio, avatarUrl, coverUrl, portfolioLink, contactEmail, whatsapp, instagram, facebook } = req.body ?? {};
     if (!fullName?.trim() || !username?.trim()) {
       return res.status(400).json({ error: 'Nome e usuário são obrigatórios.' });
+    }
+
+    const normalizedWhatsapp = normalizeWhatsapp(whatsapp);
+    if (!isValidWhatsapp(normalizedWhatsapp)) {
+      return res.status(400).json({ error: 'Informe o WhatsApp no formato internacional, apenas números.' });
     }
 
     if (username !== req.user.username) {
@@ -448,6 +508,9 @@ router.put('/users/me', authenticate, async (req: any, res) => {
       coverUrl: coverUrl ?? '',
       portfolioLink: portfolioLink ?? '',
       contactEmail: contactEmail ?? '',
+      whatsapp: normalizedWhatsapp,
+      instagram: normalizeSocial(instagram),
+      facebook: normalizeSocial(facebook),
     };
 
     await ddb.send(new PutCommand({ TableName: TABLES.users, Item: updated }));
@@ -581,6 +644,16 @@ router.post('/users/:username/follow', authenticate, async (req: any, res) => {
       ExpressionAttributeValues: { ':inc': 1 },
       ReturnValues: 'UPDATED_NEW',
     }));
+    const actor = await ddb.send(new GetCommand({ TableName: TABLES.users, Key: { id: req.user.id } }));
+    if (actor.Item) {
+      await createNotification({
+        userId: target.id,
+        type: 'follow',
+        actor: actor.Item,
+        targetType: 'profile',
+        targetId: actor.Item.username,
+      });
+    }
     res.json({ following: true, followers: updated.Attributes?.followers ?? 0 });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -675,6 +748,107 @@ router.get('/feed/following', authenticate, async (req: any, res) => {
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// -- NOTIFICAÇÕES --
+
+router.get('/notifications', authenticate, async (req: any, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string, 10) || 20, 1), 50);
+    const cursor = req.query.cursor ? JSON.parse(Buffer.from(String(req.query.cursor), 'base64url').toString('utf8')) : undefined;
+
+    const result = await ddb.send(new QueryCommand({
+      TableName: TABLES.notifications,
+      IndexName: 'userId-createdAt-index',
+      KeyConditionExpression: 'userId = :v',
+      ExpressionAttributeValues: { ':v': req.user.id },
+      ScanIndexForward: false,
+      Limit: limit,
+      ExclusiveStartKey: cursor,
+    }));
+
+    res.json({
+      notifications: result.Items ?? [],
+      nextCursor: result.LastEvaluatedKey
+        ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64url')
+        : null,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Não foi possível carregar suas notificações.' });
+  }
+});
+
+router.get('/notifications/unread-count', authenticate, async (req: any, res) => {
+  try {
+    let cursor: Record<string, any> | undefined;
+    let count = 0;
+    do {
+      const result = await ddb.send(new QueryCommand({
+        TableName: TABLES.notifications,
+        IndexName: 'userId-createdAt-index',
+        KeyConditionExpression: 'userId = :v',
+        ExpressionAttributeValues: { ':v': req.user.id },
+        ExclusiveStartKey: cursor,
+      }));
+      count += (result.Items ?? []).filter((item: any) => item.read !== true).length;
+      cursor = result.LastEvaluatedKey;
+    } while (cursor);
+
+    res.json({ count });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Não foi possível contar suas notificações.' });
+  }
+});
+
+router.patch('/notifications/:id/read', authenticate, async (req: any, res) => {
+  try {
+    const current = await ddb.send(new GetCommand({ TableName: TABLES.notifications, Key: { notificationId: req.params.id } }));
+    if (!current.Item || current.Item.userId !== req.user.id) {
+      return res.status(404).json({ error: 'Notificação não encontrada.' });
+    }
+
+    await ddb.send(new UpdateCommand({
+      TableName: TABLES.notifications,
+      Key: { notificationId: req.params.id },
+      UpdateExpression: 'SET #read = :true',
+      ExpressionAttributeNames: { '#read': 'read' },
+      ExpressionAttributeValues: { ':true': true },
+    }));
+    res.json({ ok: true });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Não foi possível marcar a notificação como lida.' });
+  }
+});
+
+router.patch('/notifications/read-all', authenticate, async (req: any, res) => {
+  try {
+    let cursor: Record<string, any> | undefined;
+    do {
+      const result = await ddb.send(new QueryCommand({
+        TableName: TABLES.notifications,
+        IndexName: 'userId-createdAt-index',
+        KeyConditionExpression: 'userId = :v',
+        ExpressionAttributeValues: { ':v': req.user.id },
+        ExclusiveStartKey: cursor,
+      }));
+
+      await Promise.all((result.Items ?? [])
+        .filter((item: any) => item.read !== true)
+        .map((item: any) => ddb.send(new UpdateCommand({
+          TableName: TABLES.notifications,
+          Key: { notificationId: item.notificationId },
+          UpdateExpression: 'SET #read = :true',
+          ExpressionAttributeNames: { '#read': 'read' },
+          ExpressionAttributeValues: { ':true': true },
+        }))));
+
+      cursor = result.LastEvaluatedKey;
+    } while (cursor);
+
+    res.json({ ok: true });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Não foi possível marcar notificações como lidas.' });
   }
 });
 
@@ -841,6 +1015,24 @@ router.post('/projects/:id/like', authenticate, async (req: any, res) => {
       ExpressionAttributeValues: { ':inc': 1 },
       ReturnValues: 'UPDATED_NEW',
     }));
+    if (project.Item.ownerId !== req.user.id) {
+      const [actor, owner] = await Promise.all([
+        ddb.send(new GetCommand({ TableName: TABLES.users, Key: { id: req.user.id } })),
+        ddb.send(new GetCommand({ TableName: TABLES.users, Key: { id: project.Item.ownerId } })),
+      ]);
+      if (actor.Item) {
+        const targetUrl = owner.Item?.username && project.Item.slug ? `/@${owner.Item.username}/${project.Item.slug}` : '';
+        await createNotification({
+          userId: project.Item.ownerId,
+          type: 'like',
+          actor: actor.Item,
+          targetType: 'project',
+          targetId: project.Item.id,
+          targetTitle: project.Item.title,
+          targetUrl,
+        });
+      }
+    }
     res.json({ liked: true, likeCount: updated.Attributes?.likeCount ?? 0 });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

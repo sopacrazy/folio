@@ -11,6 +11,9 @@ export const users = sqliteTable('users', {
   category: text('category'), // e.g. "UI/UX Designer", "Illustrator"
   avatarUrl: text('avatar_url'),
   coverUrl: text('cover_url'),
+  whatsapp: text('whatsapp'),
+  instagram: text('instagram'),
+  facebook: text('facebook'),
   externalLinks: text('external_links', { mode: 'json' }), // array of { title, url }
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
@@ -148,4 +151,3 @@ export const commentsRelations = relations(comments, ({ one }) => ({
     references: [projects.id],
   }),
 }));
-

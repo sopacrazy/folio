@@ -1,7 +1,7 @@
-import { useState, FormEvent } from 'react';
+import { useEffect, useState, FormEvent } from 'react';
 import { Routes, Route, Navigate, Link, NavLink, useLocation, useNavigate, matchPath, type Location } from 'react-router';
 import { useAuthStore } from './store/auth';
-import { Mail, Menu, Plus, Search, Settings } from 'lucide-react';
+import { Bell, Heart, Mail, Menu, Plus, Search, Settings, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -35,6 +35,159 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     'text-sm font-semibold transition-colors',
     isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
   );
+
+type NotificationItem = {
+  notificationId: string;
+  type: 'like' | 'follow' | 'comment' | 'mention';
+  actorName: string;
+  actorAvatar?: string;
+  targetType: 'project' | 'profile';
+  targetId: string;
+  targetTitle?: string;
+  targetUrl?: string;
+  read?: boolean;
+  createdAt: string;
+};
+
+function relativeTime(value: string) {
+  const diff = Date.now() - new Date(value).getTime();
+  const minutes = Math.max(1, Math.floor(diff / 60000));
+  if (minutes < 60) return `há ${minutes}min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `há ${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `há ${days}d`;
+}
+
+function notificationText(item: NotificationItem) {
+  if (item.type === 'like') return `${item.actorName} curtiu seu projeto "${item.targetTitle || 'Projeto'}"`;
+  if (item.type === 'follow') return `${item.actorName} começou a seguir você`;
+  if (item.type === 'comment') return `${item.actorName} comentou no seu projeto "${item.targetTitle || 'Projeto'}"`;
+  return `${item.actorName} mencionou você`;
+}
+
+function NotificationsDropdown() {
+  const { token } = useAuthStore();
+  const navigate = useNavigate();
+  const [items, setItems] = useState<NotificationItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+
+  const loadUnreadCount = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/notifications/unread-count', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUnreadCount(data.count ?? 0);
+      }
+    } catch {
+      // Mantém o contador atual se a rede falhar.
+    }
+  };
+
+  const loadNotifications = async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const res = await fetch('/api/notifications?limit=20', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setItems(data.notifications ?? []);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    if (!token || unreadCount === 0) return;
+    setUnreadCount(0);
+    setItems((current) => current.map((item) => ({ ...item, read: true })));
+    await fetch('/api/notifications/read-all', {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => undefined);
+  };
+
+  useEffect(() => {
+    loadUnreadCount();
+    const interval = window.setInterval(loadUnreadCount, 45000);
+    return () => window.clearInterval(interval);
+  }, [token]);
+
+  const handleOpenChange = (open: boolean) => {
+    if (!open) return;
+    loadNotifications().then(markAllAsRead);
+  };
+
+  const handleNotificationClick = async (item: NotificationItem) => {
+    if (token && item.read !== true) {
+      await fetch(`/api/notifications/${item.notificationId}/read`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => undefined);
+    }
+    if (item.type === 'follow') navigate(`/@${item.targetId}`);
+    if (item.type === 'like' && item.targetUrl) navigate(item.targetUrl);
+  };
+
+  return (
+    <DropdownMenu onOpenChange={handleOpenChange}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="relative">
+          <Bell className="w-5 h-5" />
+          {unreadCount > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-[360px] p-0">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <p className="font-bold text-foreground">Notificações</p>
+          <button type="button" onClick={markAllAsRead} className="text-xs font-semibold text-primary hover:text-primary-hover">
+            Marcar todas como lidas
+          </button>
+        </div>
+        <div className="max-h-[420px] overflow-y-auto py-1">
+          {loading ? (
+            <div className="px-4 py-8 text-center text-sm text-muted-foreground">Carregando...</div>
+          ) : items.length === 0 ? (
+            <div className="px-4 py-8 text-center text-sm text-muted-foreground">Nenhuma notificação por enquanto</div>
+          ) : (
+            items.map((item) => (
+              <button
+                key={item.notificationId}
+                type="button"
+                onClick={() => handleNotificationClick(item)}
+                className={cn(
+                  'flex w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-muted',
+                  item.read !== true && 'bg-primary/5'
+                )}
+              >
+                <Avatar className="h-9 w-9 shrink-0">
+                  <AvatarImage src={item.actorAvatar} alt={item.actorName} />
+                  <AvatarFallback>{item.actorName?.charAt(0) || '?'}</AvatarFallback>
+                </Avatar>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm leading-snug text-foreground">{notificationText(item)}</span>
+                  <span className="mt-1 block text-xs text-muted-foreground">{relativeTime(item.createdAt)}</span>
+                </span>
+                {item.type === 'like' ? <Heart className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" /> : <UserPlus className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />}
+              </button>
+            ))
+          )}
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 function Navbar() {
   const { user, logout } = useAuthStore();
@@ -82,6 +235,7 @@ function Navbar() {
                   <Mail className="w-5 h-5" />
                   <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-primary" />
                 </Button>
+                <NotificationsDropdown />
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

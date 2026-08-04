@@ -16,4 +16,5 @@ export const TABLES = {
   userBadges: 'FolioUserBadges',
   follows: 'FolioFollows',
   likes: 'FolioLikes',
+  notifications: 'FolioNotifications',
 } as const;

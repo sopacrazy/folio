@@ -8,6 +8,9 @@ interface User {
   bio?: string;
   avatarUrl?: string;
   coverUrl?: string;
+  whatsapp?: string;
+  instagram?: string;
+  facebook?: string;
   onboardingCompleted?: boolean;
   onboardingStep?: number;
 }
