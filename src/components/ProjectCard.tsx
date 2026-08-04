@@ -9,10 +9,11 @@ import { cn } from '@/lib/utils';
 
 interface ProjectCardProps {
   project: any;
+  compact?: boolean;
   [key: string]: any;
 }
 
-export default function ProjectCard({ project }: ProjectCardProps) {
+export default function ProjectCard({ project, compact = false }: ProjectCardProps) {
   const href = `/@${project.user?.username}/${project.slug}`;
   const isReal = project.source !== 'mock';
   const { token } = useAuthStore();
@@ -70,7 +71,10 @@ export default function ProjectCard({ project }: ProjectCardProps) {
           src={project.coverImageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop'}
           alt={project.title}
           loading="lazy"
-          className="w-full h-auto block group-hover:scale-105 transition-transform duration-500"
+          className={cn(
+            'w-full block group-hover:scale-105 transition-transform duration-500',
+            compact ? 'aspect-[4/3] h-auto object-cover' : 'h-auto'
+          )}
         />
       </Link>
 

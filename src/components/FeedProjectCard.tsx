@@ -69,7 +69,7 @@ export default function FeedProjectCard({ project }: FeedProjectCardProps) {
           src={project.coverImageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop'}
           alt={project.title}
           loading="lazy"
-          className="block w-full h-auto min-h-[140px] max-h-[280px] object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+          className="block aspect-[4/3] w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
         />
         <button
           type="button"

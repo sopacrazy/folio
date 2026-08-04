@@ -115,7 +115,7 @@ function toCreatorSummary(user: Record<string, any>) {
 
 function toProfile(user: Record<string, any>) {
   const {
-    id, username, fullName, bio, category, location,
+    id, username, fullName, bio, category, location, createdAt,
     avatarUrl, coverUrl, portfolioLink, contactEmail, followers, skills,
   } = user;
   return {
@@ -123,7 +123,7 @@ function toProfile(user: Record<string, any>) {
     bio: bio ?? '', category: category ?? '', location: location ?? '',
     avatarUrl: avatarUrl ?? '', coverUrl: coverUrl ?? '',
     portfolioLink: portfolioLink ?? '', contactEmail: contactEmail ?? '',
-    followers: followers ?? 0, skills: skills ?? [],
+    followers: followers ?? 0, skills: skills ?? [], createdAt: createdAt ?? '',
   };
 }
 
@@ -400,11 +400,16 @@ router.get('/users/:username', optionalAuthenticate, async (req: any, res) => {
     const user = await findUserByUsername(req.params.username);
     if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
-    const [badges, projects, likedIds, isFollowingByMe] = await Promise.all([
+    const [badges, projects, likedIds, isFollowingByMe, following] = await Promise.all([
       getUserBadges(user.id),
       getProjectsByOwnerId(user.id),
       getLikedProjectIds(req.user?.id),
       isFollowingUser(req.user?.id, user.id),
+      ddb.send(new QueryCommand({
+        TableName: TABLES.follows,
+        KeyConditionExpression: 'followerId = :v',
+        ExpressionAttributeValues: { ':v': user.id },
+      })),
     ]);
 
     const sortedProjects = projects
@@ -412,7 +417,7 @@ router.get('/users/:username', optionalAuthenticate, async (req: any, res) => {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .map((p) => toProjectResponse(p, user, likedIds.has(p.id)));
 
-    res.json({ ...toProfile(user), badges, projects: sortedProjects, isFollowingByMe });
+    res.json({ ...toProfile(user), badges, projects: sortedProjects, followingCount: following.Items?.length ?? 0, isFollowingByMe });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

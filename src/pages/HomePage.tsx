@@ -1,18 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import Masonry from 'react-masonry-css';
 import {
   ArrowRight,
   Briefcase,
   Check,
-  Coffee,
   Heart,
   LayoutGrid,
   List,
   Search,
   Share2,
   SlidersHorizontal,
-  Sprout,
   Users,
 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
@@ -31,44 +28,8 @@ import ProjectCard from '../components/ProjectCard';
 import FeedProjectCard from '../components/FeedProjectCard';
 import EmptyState from '../components/EmptyState';
 
-const MASONRY_BREAKPOINTS = { default: 5, 1536: 4, 1180: 3, 820: 2, 560: 1 };
 const feedTabs = ['Para você', 'Seguindo', 'O melhor do Portsy'];
 const feedCategories = ['Design gráfico', 'Fotografia', 'Ilustração', '3D Art', 'UI/UX', 'Branding', 'Arquitetura'];
-
-function HeroIllustration() {
-  return (
-    <div className="relative hidden md:block">
-      <div className="rounded-2xl border border-border bg-white shadow-xl overflow-hidden">
-        <div className="flex items-center gap-1.5 px-4 py-3 border-b border-border bg-muted">
-          <span className="w-2.5 h-2.5 rounded-full bg-gray-300" />
-          <span className="w-2.5 h-2.5 rounded-full bg-gray-300" />
-          <span className="w-2.5 h-2.5 rounded-full bg-gray-300" />
-        </div>
-        <div className="p-5">
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-9 h-9 rounded-full bg-muted" />
-            <div className="space-y-1.5 flex-1">
-              <div className="h-2 w-28 bg-muted rounded-full" />
-              <div className="h-2 w-16 bg-muted rounded-full" />
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="aspect-square rounded-xl bg-gradient-to-br from-blue-100 to-primary/50" />
-            <div className="aspect-square rounded-xl bg-gradient-to-br from-sky-200 to-indigo-300" />
-            <div className="aspect-square rounded-xl bg-gradient-to-br from-emerald-200 to-teal-300" />
-          </div>
-        </div>
-      </div>
-
-      <div className="absolute -left-6 -bottom-6 w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-        <Sprout className="w-8 h-8 text-primary" />
-      </div>
-      <div className="absolute -right-5 -top-5 w-14 h-14 rounded-2xl bg-white shadow-md border border-border flex items-center justify-center">
-        <Coffee className="w-6 h-6 text-primary" />
-      </div>
-    </div>
-  );
-}
 
 function DiscoveryHome({ token }: { token: string | null }) {
   const creators = getCreators();
@@ -86,24 +47,47 @@ function DiscoveryHome({ token }: { token: string | null }) {
 
   return (
     <>
-      <section className="bg-accent/15">
-        <div className="mx-auto grid w-full max-w-[1880px] grid-cols-1 items-center gap-12 px-5 py-16 md:grid-cols-2 md:py-24 lg:px-8">
-          <div>
-            <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-foreground leading-tight">
+      <section className="overflow-hidden bg-primary text-white">
+        <div className="mx-auto flex min-h-[640px] w-full max-w-[1880px] flex-col px-5 pt-24 lg:px-8">
+          <div className="mx-auto flex max-w-5xl flex-1 flex-col items-center justify-center text-center">
+            <p className="mb-5 text-sm font-bold uppercase tracking-[0.24em] text-white/70">Portsy Portfolio</p>
+            <h1 className="text-5xl font-semibold leading-[1.04] tracking-tight md:text-7xl">
               Descubra portfólios criativos que inspiram.
             </h1>
-            <p className="text-lg text-muted-foreground mt-6 max-w-xl">
-              Portsy é o lar de artistas, designers e criadores. Explore trabalhos originais e apoie quem está por trás deles.
+            <p className="mt-7 max-w-2xl text-lg leading-relaxed text-white/80 md:text-xl">
+              Explore projetos, encontre criadores e publique um portfólio visual para mostrar seu trabalho com presença.
             </p>
-            <div className="mt-8">
-              <Button asChild size="lg">
+            <div className="mt-10">
+              <Button asChild size="lg" className="rounded-full bg-white px-9 text-primary shadow-xl hover:bg-white/90">
                 <Link to="/criadores">
-                  Explorar Criadores <ArrowRight className="w-4 h-4" />
+                  Começar <ArrowRight className="w-4 h-4" />
                 </Link>
               </Button>
             </div>
           </div>
-          <HeroIllustration />
+
+          <div className="mt-16 grid h-56 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {latestProjects.slice(0, 6).map((project: any, index) => (
+              <Link
+                key={project.id}
+                to={`/@${project.user?.username}/${project.slug}`}
+                className="group relative overflow-hidden rounded-t-xl bg-white/15"
+              >
+                <img
+                  src={project.coverImageUrl}
+                  alt={project.title}
+                  className="h-full w-full object-cover opacity-90 transition-transform duration-500 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
+                <span className="absolute bottom-3 left-3 right-3 line-clamp-1 text-sm font-bold">{project.title}</span>
+                {index === 0 && (
+                  <span className="absolute right-3 top-3 rounded-full bg-white/90 px-2 py-1 text-xs font-bold text-primary">
+                    Novo
+                  </span>
+                )}
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -140,10 +124,10 @@ function DiscoveryHome({ token }: { token: string | null }) {
               Ver todos os projetos <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
-          <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5 gap-6">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {latestProjects.map((project: any) => (
-              <div key={project.id} className="mb-6 break-inside-avoid">
-                <ProjectCard project={project} />
+              <div key={project.id} className="min-w-0">
+                <ProjectCard project={project} compact />
               </div>
             ))}
           </div>
@@ -159,7 +143,7 @@ function FollowingFeed({ token }: { token: string | null }) {
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<'recent' | 'liked'>('recent');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [feedMode, setFeedMode] = useState<'for-you' | 'following'>('for-you');
+  const [feedMode, setFeedMode] = useState<'for-you' | 'following' | 'best'>('following');
   const [searchTerm, setSearchTerm] = useState('');
 
   const projects = useMemo(() => {
@@ -264,8 +248,8 @@ function FollowingFeed({ token }: { token: string | null }) {
             <div className="flex min-w-0 items-center justify-between gap-5 border-b border-border">
               <div className="flex min-w-0 items-end gap-7 overflow-x-auto no-scrollbar">
                 {feedTabs.map((label) => {
-                  const mode = label === 'Seguindo' ? 'following' : 'for-you';
-                  const active = feedMode === mode || (label === 'Para você' && feedMode === 'for-you');
+                  const mode = label === 'Seguindo' ? 'following' : label === 'O melhor do Portsy' ? 'best' : 'for-you';
+                  const active = feedMode === mode;
                   return (
                     <button
                       key={label}
@@ -345,15 +329,14 @@ function FollowingFeed({ token }: { token: string | null }) {
         </div>
 
         {loading ? (
-          <Masonry breakpointCols={MASONRY_BREAKPOINTS} className="flex -ml-5 w-auto" columnClassName="pl-5 bg-clip-padding">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
               <div
                 key={i}
-                className="mb-7 animate-pulse rounded-md bg-muted"
-                style={{ height: 220 + (i % 4) * 58 }}
+                className="h-80 animate-pulse rounded-2xl bg-muted"
               />
             ))}
-          </Masonry>
+          </div>
         ) : sortedProjects.length === 0 ? (
           <EmptyState
             icon={Users}
@@ -367,13 +350,13 @@ function FollowingFeed({ token }: { token: string | null }) {
             ))}
           </div>
         ) : (
-          <Masonry breakpointCols={MASONRY_BREAKPOINTS} className="flex -ml-5 w-auto" columnClassName="pl-5 bg-clip-padding">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {sortedProjects.map((project: any) => (
-              <div key={project.id} className="mb-7">
+              <div key={project.id} className="min-w-0">
                 <FeedProjectCard project={project} />
               </div>
             ))}
-          </Masonry>
+          </div>
         )}
       </div>
     </div>

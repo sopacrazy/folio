@@ -1,9 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router';
 import ProjectCard from '../components/ProjectCard';
 import BadgeIcon from '../components/BadgeIcon';
 import EmptyState from '../components/EmptyState';
-import { FolderPlus, Link as LinkIcon, Mail, MoreHorizontal, Plus, UserPlus } from 'lucide-react';
+import {
+  Calendar,
+  ExternalLink,
+  FolderPlus,
+  Heart,
+  Link as LinkIcon,
+  Mail,
+  MapPin,
+  MoreHorizontal,
+  Plus,
+  UserPlus,
+} from 'lucide-react';
 import { getUserByUsername } from '../mockData';
 import { useAuthStore } from '../store/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -11,6 +22,78 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+function ProfileProjectCard({ project }: { project: any }) {
+  return (
+    <div className="min-w-0">
+      <ProjectCard project={project} compact />
+    </div>
+  );
+}
+
+function formatJoinDate(value?: string | Date) {
+  if (!value) return 'Entrou recentemente';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Entrou recentemente';
+  return `Entrou em ${date.getFullYear()}`;
+}
+
+function compactNumber(value: number) {
+  return new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+}
+
+function AboutCard({ user }: { user: any }) {
+  const portfolioHref = user.portfolioLink
+    ? user.portfolioLink.startsWith('http')
+      ? user.portfolioLink
+      : `https://${user.portfolioLink}`
+    : '';
+
+  return (
+    <Card className="rounded-xl">
+      <CardContent className="p-5">
+        <h2 className="mb-3 text-base font-bold text-foreground">Sobre</h2>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          {user.bio || 'Este criador ainda não escreveu uma bio.'}
+        </p>
+
+        <div className="mt-5 space-y-3 text-sm text-muted-foreground">
+          {user.location && (
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 shrink-0" />
+              <span>{user.location}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 shrink-0" />
+            <span>{formatJoinDate(user.createdAt)}</span>
+          </div>
+          {user.portfolioLink && (
+            <a
+              href={portfolioHref}
+              target="_blank"
+              rel="noreferrer"
+              className="flex min-w-0 items-center gap-2 transition-colors hover:text-primary"
+            >
+              <LinkIcon className="h-4 w-4 shrink-0" />
+              <span className="truncate">{user.portfolioLink}</span>
+              <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+            </a>
+          )}
+          {user.contactEmail && (
+            <a
+              href={`mailto:${user.contactEmail}`}
+              className="flex min-w-0 items-center gap-2 transition-colors hover:text-primary"
+            >
+              <Mail className="h-4 w-4 shrink-0" />
+              <span className="truncate">{user.contactEmail}</span>
+            </a>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function ProfilePage() {
   const { handle } = useParams();
@@ -48,11 +131,9 @@ export default function ProfilePage() {
           return;
         }
       } catch {
-        // API indisponível — cai pro fallback abaixo.
+        // API indisponível: usa os perfis de demonstração.
       }
 
-      // Os usuários de demonstração (Ana, João, Mel...) ainda só existem nos
-      // dados mock, não no DynamoDB — fallback pra manter a navegação funcionando.
       const mockUser = getUserByUsername(username);
       if (!cancelled) {
         if (mockUser) {
@@ -107,36 +188,24 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <div>
-        <Skeleton className="h-36 md:h-40 w-full rounded-none" />
+        <Skeleton className="h-56 w-full rounded-none md:h-80 lg:h-96" />
         <div className="mx-auto w-full max-w-[1880px] px-5 pb-16 lg:px-8">
-          <div className="relative -mt-14 sm:-mt-16 mb-8 flex flex-col md:flex-row gap-6 md:items-end justify-between">
-            <div className="flex flex-col md:flex-row gap-5 md:items-end">
-              <Skeleton className="w-28 h-28 md:w-32 md:h-32 rounded-full border-4 border-white" />
-              <div className="pb-2 space-y-2">
-                <Skeleton className="h-6 w-40" />
-                <Skeleton className="h-4 w-28" />
+          <div className="-mt-11 mb-8 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end">
+              <Skeleton className="h-28 w-28 rounded-full border-4 border-white" />
+              <div className="space-y-2 pb-2">
+                <Skeleton className="h-7 w-48" />
+                <Skeleton className="h-4 w-32" />
               </div>
             </div>
-            <Skeleton className="h-10 w-32 rounded-full" />
+            <Skeleton className="h-10 w-32 rounded-lg" />
           </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-4 lg:gap-6">
-            <div className="order-2 lg:order-1">
-              <Card>
-                <CardContent className="p-5 space-y-3">
-                  <Skeleton className="h-4 w-16" />
-                  <Skeleton className="h-3 w-full" />
-                  <Skeleton className="h-3 w-3/4" />
-                </CardContent>
-              </Card>
-            </div>
-            <div className="order-1 lg:order-2 min-w-0 columns-1 sm:columns-2 xl:columns-3 2xl:columns-4 gap-6">
+          <Skeleton className="mb-8 h-20 rounded-xl" />
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+            <Skeleton className="h-56 rounded-xl" />
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
               {[1, 2, 3, 4].map((i) => (
-                <Skeleton
-                  key={i}
-                  className="mb-6 break-inside-avoid rounded-2xl"
-                  style={{ height: 220 + (i % 2) * 60 }}
-                />
+                <Skeleton key={i} className="h-72 rounded-xl" />
               ))}
             </div>
           </div>
@@ -151,131 +220,120 @@ export default function ProfilePage() {
 
   const isOwnProfile = currentUser?.username === user.username;
   const visibleProjects = isOwnProfile ? user.projects : user.projects.filter((p: any) => p.isPublic);
+  const receivedLikes = visibleProjects.reduce((sum: number, project: any) => sum + (project.likeCount || 0), 0);
+  const followingCount = user.followingCount ?? user.following ?? 0;
+  const likedProjects = user.likedProjects ?? [];
+
+  const stats = [
+    { label: 'projetos', value: visibleProjects.length },
+    { label: 'seguidores', value: followerCount },
+    { label: 'seguindo', value: followingCount },
+    { label: 'curtidas recebidas', value: receivedLikes },
+  ];
 
   return (
     <div>
-      {/* Cover */}
-      <div className="h-36 md:h-40 bg-muted w-full relative overflow-hidden">
+      <div className="relative h-56 w-full overflow-hidden bg-muted md:h-80 lg:h-96">
         {user.coverUrl && (
-          <img src={user.coverUrl} alt="Cover" className="w-full h-full object-cover" />
+          <>
+            <img
+              src={user.coverUrl}
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 h-full w-full scale-110 object-cover blur-xl md:hidden"
+            />
+            <div className="absolute inset-0 bg-black/10 md:hidden" />
+            <img
+              src={user.coverUrl}
+              alt="Capa do perfil"
+              className="relative h-full w-full object-contain md:object-cover"
+            />
+          </>
         )}
       </div>
 
       <div className="mx-auto w-full max-w-[1880px] px-5 pb-16 lg:px-8">
-        {/* Profile Info */}
-        <div className="relative -mt-14 sm:-mt-16 mb-8 flex flex-col md:flex-row gap-6 md:items-end justify-between">
-          <div className="flex flex-col md:flex-row gap-5 md:items-end">
-            <Avatar className="w-28 h-28 md:w-32 md:h-32 border-4 border-white shadow-sm">
-              <AvatarImage src={user.avatarUrl} alt={user.fullName} />
-              <AvatarFallback className="text-3xl">{user.fullName.charAt(0)}</AvatarFallback>
-            </Avatar>
+        <header className="-mt-11 mb-0">
+          <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end">
+              <Avatar className="h-28 w-28 border-4 border-background shadow-sm">
+                <AvatarImage src={user.avatarUrl} alt={user.fullName} />
+                <AvatarFallback className="text-3xl">{user.fullName.charAt(0)}</AvatarFallback>
+              </Avatar>
 
-            <div className="pb-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-2xl md:text-3xl font-bold text-foreground">{user.fullName}</h1>
-                {user.category && (
-                  <span className="bg-tag text-tag-foreground text-[11px] font-semibold px-2.5 py-1 rounded-full">
-                    {user.category}
-                  </span>
-                )}
-                {user.badges?.length > 0 && (
-                  <span className="flex items-center gap-1">
-                    {user.badges.map((badge: any) => (
-                      <BadgeIcon key={badge.id} iconName={badge.iconName} color={badge.color} label={badge.label} />
-                    ))}
-                  </span>
-                )}
+              <div className="pb-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-2xl font-bold text-foreground md:text-3xl">{user.fullName}</h1>
+                  {user.category && (
+                    <span className="rounded-full bg-tag px-2.5 py-1 text-[11px] font-semibold text-tag-foreground">
+                      {user.category}
+                    </span>
+                  )}
+                  {user.badges?.length > 0 && (
+                    <span className="flex items-center gap-1">
+                      {user.badges.map((badge: any) => (
+                        <BadgeIcon key={badge.id} iconName={badge.iconName} color={badge.color} label={badge.label} />
+                      ))}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 font-medium text-muted-foreground">@{user.username}</p>
               </div>
-              <p className="text-muted-foreground font-medium">
-                @{user.username} · {followerCount.toLocaleString('pt-BR')} seguidores
-              </p>
+            </div>
+
+            <div className="flex gap-2 pb-2">
+              {isOwnProfile ? (
+                <Button asChild>
+                  <Link to="/novo-projeto">
+                    <Plus className="h-4 w-4" /> Novo projeto
+                  </Link>
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    variant={isFollowing ? 'outline' : 'default'}
+                    onClick={handleFollowToggle}
+                    disabled={user.source !== 'real' || followLoading}
+                  >
+                    <UserPlus className="h-4 w-4" /> {isFollowing ? 'Seguindo' : 'Seguir'}
+                  </Button>
+                  <Button variant="outline" size="icon" aria-label="Mais opções">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
             </div>
           </div>
+        </header>
 
-          <div className="flex gap-2 pb-2">
-            {isOwnProfile ? (
-              <Button asChild>
-                <Link to="/novo-projeto">
-                  <Plus className="w-4 h-4" /> Novo projeto
-                </Link>
-              </Button>
-            ) : (
-              <>
-                <Button
-                  variant={isFollowing ? 'outline' : 'default'}
-                  onClick={handleFollowToggle}
-                  disabled={user.source !== 'real' || followLoading}
-                >
-                  <UserPlus className="w-4 h-4" /> {isFollowing ? 'Seguindo' : 'Seguir'}
-                </Button>
-                <Button variant="outline" size="icon">
-                  <MoreHorizontal className="w-4 h-4" />
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
-
-        <Tabs defaultValue="projetos">
-          <TabsList className="mb-8">
-            <TabsTrigger value="projetos">Projetos</TabsTrigger>
-            <TabsTrigger value="sobre">Sobre</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="projetos">
-            <div className="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-4 lg:gap-6">
-              {/* Sidebar */}
-              <div className="order-2 lg:order-1">
-                <Card>
-                  <CardContent className="p-5 space-y-5">
-                    {user.bio && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-foreground mb-2">Sobre</h3>
-                        <p className="text-muted-foreground leading-relaxed text-sm">{user.bio}</p>
-                      </div>
-                    )}
-
-                    {(user.portfolioLink || user.contactEmail) && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-foreground mb-2">Links</h3>
-                        <ul className="space-y-2.5 text-sm">
-                          {user.portfolioLink && (
-                            <li>
-                              <a
-                                href={user.portfolioLink.startsWith('http') ? user.portfolioLink : `https://${user.portfolioLink}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors truncate"
-                              >
-                                <LinkIcon className="w-4 h-4 shrink-0" /> {user.portfolioLink}
-                              </a>
-                            </li>
-                          )}
-                          {user.contactEmail && (
-                            <li>
-                              <a
-                                href={`mailto:${user.contactEmail}`}
-                                className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors truncate"
-                              >
-                                <Mail className="w-4 h-4 shrink-0" /> {user.contactEmail}
-                              </a>
-                            </li>
-                          )}
-                        </ul>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+        <section className="mt-7 border-y border-border py-5">
+          <div className="grid grid-cols-2 gap-4 sm:flex sm:flex-wrap sm:items-center sm:gap-10">
+            {stats.map((stat) => (
+              <div key={stat.label}>
+                <span className="text-xl font-bold text-foreground">{compactNumber(stat.value)}</span>
+                <span className="ml-1 text-sm font-medium text-muted-foreground">{stat.label}</span>
               </div>
+            ))}
+          </div>
+        </section>
 
-              {/* Projects */}
-              <div className="order-1 lg:order-2 min-w-0">
+        <div className="mt-8 grid max-w-6xl grid-cols-1 gap-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start">
+          <aside className="order-1 lg:sticky lg:top-24">
+            <AboutCard user={user} />
+          </aside>
+
+          <main className="order-2 min-w-0">
+            <Tabs defaultValue="projetos">
+              <TabsList className="mb-6">
+                <TabsTrigger value="projetos">Projetos</TabsTrigger>
+                <TabsTrigger value="curtidos">Curtidos</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="projetos">
                 {visibleProjects.length > 0 ? (
-                  <div className="columns-1 sm:columns-2 xl:columns-3 2xl:columns-4 gap-6">
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
                     {visibleProjects.map((project: any) => (
-                      <div key={project.id} className="mb-6 break-inside-avoid">
-                        <ProjectCard project={project} />
-                      </div>
+                      <ProfileProjectCard key={project.id} project={project} />
                     ))}
                   </div>
                 ) : (
@@ -289,19 +347,28 @@ export default function ProfilePage() {
                     />
                   </Card>
                 )}
-              </div>
-            </div>
-          </TabsContent>
+              </TabsContent>
 
-          <TabsContent value="sobre">
-            <Card className="max-w-2xl">
-              <CardContent className="p-6">
-                <h3 className="text-sm font-semibold text-foreground mb-3">Sobre {user.fullName}</h3>
-                <p className="text-muted-foreground leading-relaxed">{user.bio || 'Este criador ainda não escreveu uma bio.'}</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              <TabsContent value="curtidos">
+                {likedProjects.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                    {likedProjects.map((project: any) => (
+                      <ProfileProjectCard key={project.id} project={project} />
+                    ))}
+                  </div>
+                ) : (
+                  <Card>
+                    <EmptyState
+                      icon={Heart}
+                      title="Nenhum projeto curtido ainda"
+                      description="Os projetos curtidos por este perfil aparecerão aqui."
+                    />
+                  </Card>
+                )}
+              </TabsContent>
+            </Tabs>
+          </main>
+        </div>
       </div>
     </div>
   );
