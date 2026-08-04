@@ -101,10 +101,10 @@ export default function ProjectCard({ project }: ProjectCardProps) {
               aria-label={liked ? 'Descurtir' : 'Curtir'}
               className={cn(
                 'flex items-center gap-1 text-xs transition-colors',
-                isReal ? 'hover:text-red-500 cursor-pointer' : 'cursor-default'
+                isReal ? 'hover:text-primary cursor-pointer' : 'cursor-default'
               )}
             >
-              <Heart className={cn('w-3.5 h-3.5', liked && 'fill-red-500 text-red-500')} /> {likeCount}
+              <Heart className={cn('w-3.5 h-3.5', liked && 'fill-primary text-primary')} /> {likeCount}
             </button>
             <span className="flex items-center gap-1 text-xs">
               <MessageCircle className="w-3.5 h-3.5" /> {project.commentCount || 0}

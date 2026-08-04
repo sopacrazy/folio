@@ -112,7 +112,7 @@ export default function LoginPage({ isRegister = false }: { isRegister?: boolean
 
           <div className="mt-8 text-center text-sm text-muted-foreground font-medium">
             {isRegister ? 'Já tem uma conta?' : 'Ainda não tem conta?'}
-            <a href={isRegister ? '/login' : '/register'} className="text-primary hover:text-primary/80 ml-1">
+            <a href={isRegister ? '/login' : '/register'} className="text-primary hover:text-primary-hover ml-1">
               {isRegister ? 'Faça login' : 'Cadastre-se'}
             </a>
           </div>

@@ -6,7 +6,9 @@ import {
   Image as ImageIcon,
   LayoutGrid,
   Loader2,
+  Paintbrush,
   Plus,
+  Settings,
   Trash2,
   Type as TypeIcon,
   UploadCloud,
@@ -44,10 +46,22 @@ function AddContentButton({ type, onClick }: { type: ProjectBlockType; onClick: 
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-col items-center justify-center gap-2 rounded-xl border border-input bg-background hover:border-primary/60 hover:bg-primary/5 transition-colors py-4"
+      className="group flex min-h-24 flex-col items-center justify-center rounded-xl border border-border bg-muted/60 px-4 py-5 text-center transition-colors hover:border-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <Icon className="w-5 h-5 text-foreground" />
-      <span className="text-xs font-medium text-foreground text-center px-1">{label}</span>
+      <Icon className="mb-2 h-7 w-7 text-foreground transition-colors group-hover:text-primary" />
+      <span className="text-xs font-semibold leading-tight text-foreground">{label}</span>
+    </button>
+  );
+}
+
+function EditProjectButton({ icon: Icon, label }: { icon: typeof Paintbrush; label: string }) {
+  return (
+    <button
+      type="button"
+      className="group flex min-h-20 flex-col items-center justify-center rounded-xl border border-border bg-muted/60 px-3 py-4 text-center transition-colors hover:border-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <Icon className="mb-2 h-5 w-5 text-foreground transition-colors group-hover:text-primary" />
+      <span className="text-xs font-semibold leading-tight text-foreground">{label}</span>
     </button>
   );
 }
@@ -303,6 +317,8 @@ export default function ProjectFormPage() {
   const [fileError, setFileError] = useState('');
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState<'draft' | 'publish' | 'save' | null>(null);
+  const [finalizeOpen, setFinalizeOpen] = useState(false);
+  const [finalizeMode, setFinalizeMode] = useState<'draft' | 'publish' | 'save'>('publish');
 
   const [blocks, setBlocks] = useState<ProjectBlock[]>([]);
   const [blockUploads, setBlockUploads] = useState<Record<string, PendingUpload[]>>({});
@@ -572,11 +588,19 @@ export default function ProjectFormPage() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Não foi possível salvar o projeto.');
 
+      setFinalizeOpen(false);
       navigate(`/@${user.username}/${result.slug}`);
     } catch (err: any) {
       setFormError(err.message || 'Não foi possível salvar o projeto.');
       setSaving(null);
     }
+  };
+
+  const openFinalizeModal = (mode: 'draft' | 'publish' | 'save') => {
+    setFormError('');
+    setFinalizeMode(mode);
+    if (mode === 'publish') setIsPublic(true);
+    setFinalizeOpen(true);
   };
 
   const showSplitActions = !isEditMode || !wasPublished;
@@ -585,7 +609,7 @@ export default function ProjectFormPage() {
   return (
     <div>
       <div className="sticky top-16 z-40 bg-background/95 backdrop-blur border-b border-border">
-        <div className="max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+        <div className="max-w-none px-4 sm:px-6 lg:px-10 h-16 flex items-center justify-between gap-4">
           <button
             type="button"
             onClick={() => navigate(-1)}
@@ -597,15 +621,15 @@ export default function ProjectFormPage() {
           <div className="flex items-center gap-3">
             {showSplitActions ? (
               <>
-                <Button type="button" variant="outline" size="sm" disabled={saving !== null || uploadsPending} onClick={() => submit(false, 'draft')}>
+                <Button type="button" variant="outline" size="sm" disabled={saving !== null || uploadsPending} onClick={() => openFinalizeModal('draft')}>
                   {saving === 'draft' ? 'Salvando...' : 'Salvar rascunho'}
                 </Button>
-                <Button type="button" size="sm" disabled={saving !== null || uploadsPending} onClick={() => submit(true, 'publish')}>
+                <Button type="button" size="sm" disabled={saving !== null || uploadsPending} onClick={() => openFinalizeModal('publish')}>
                   {saving === 'publish' ? 'Publicando...' : 'Publicar projeto'}
                 </Button>
               </>
             ) : (
-              <Button type="button" size="sm" disabled={saving !== null || uploadsPending} onClick={() => submit(isPublic, 'save')}>
+              <Button type="button" size="sm" disabled={saving !== null || uploadsPending} onClick={() => openFinalizeModal('save')}>
                 {saving === 'save' ? 'Salvando...' : 'Salvar alterações'}
               </Button>
             )}
@@ -613,7 +637,7 @@ export default function ProjectFormPage() {
         </div>
       </div>
 
-      <div className="max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="max-w-none px-4 sm:px-6 lg:px-10 py-8 lg:py-10">
       {formError && (
         <div className="text-sm rounded-xl p-4 mb-6 font-medium bg-red-50 text-red-700">{formError}</div>
       )}
@@ -621,9 +645,9 @@ export default function ProjectFormPage() {
         <div className="text-sm rounded-xl p-4 mb-6 font-medium bg-red-50 text-red-700">{fileError}</div>
       )}
 
-      <form onSubmit={(e: FormEvent) => e.preventDefault()} className="lg:flex lg:items-start lg:gap-8">
-        <div className="flex-1 min-w-0 rounded-2xl bg-card overflow-hidden">
-          <div className="p-8 md:p-12">
+      <form onSubmit={(e: FormEvent) => e.preventDefault()} className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-6 items-start">
+        <div className="min-w-0 min-h-[calc(100vh-14rem)] rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+          <div className="hidden">
             <h1 className="text-3xl font-bold text-foreground mb-8">
               {isEditMode ? 'Editar projeto' : 'Novo projeto'}
             </h1>
@@ -720,9 +744,9 @@ export default function ProjectFormPage() {
               separados: cada seção só é dividida por uma linha fina, como no
               Behance. */}
           {blocks.length === 0 ? (
-            <div className="min-h-[380px] border-t border-border flex flex-col items-center justify-center gap-10 py-16 px-6">
+            <div className="min-h-[calc(100vh-14rem)] flex flex-col items-center justify-center gap-14 py-16 px-8">
               <p className="text-lg text-muted-foreground">Comece a criar seu projeto:</p>
-              <div className="flex flex-wrap items-start justify-center gap-8">
+              <div className="flex flex-wrap items-start justify-center gap-10 xl:gap-14">
                 <EmptyStateAddButton type="image" onClick={() => addBlock('image')} />
                 <EmptyStateAddButton type="text" onClick={() => addBlock('text')} />
                 <EmptyStateAddButton type="grid" onClick={() => addBlock('grid')} />
@@ -772,20 +796,163 @@ export default function ProjectFormPage() {
             )}
         </div>
 
-        <aside className="lg:w-72 shrink-0 mt-6 lg:mt-0">
-          <div className="lg:sticky lg:top-6 space-y-6">
-            <Card className="p-6">
-              <h2 className="text-sm font-bold text-foreground mb-4">Adicionar conteúdo</h2>
+        <aside className="w-full xl:w-[300px] shrink-0">
+          <div className="xl:sticky xl:top-40 rounded-xl border border-border bg-white shadow-sm overflow-hidden">
+            <section className="p-4">
+              <h2 className="text-sm font-bold text-foreground mb-3">Adicionar conteúdo</h2>
               <div className="grid grid-cols-2 gap-3">
                 <AddContentButton type="image" onClick={() => addBlock('image')} />
                 <AddContentButton type="text" onClick={() => addBlock('text')} />
                 <AddContentButton type="grid" onClick={() => addBlock('grid')} />
                 <AddContentButton type="video" onClick={() => addBlock('video')} />
               </div>
-            </Card>
+            </section>
 
-            <Card className="p-6">
-              <label className="flex items-center gap-2.5 text-sm font-medium text-foreground cursor-pointer">
+            <section className="border-t border-border p-4">
+              <h2 className="text-sm font-bold text-foreground mb-3">Editar projeto</h2>
+              <div className="grid grid-cols-2 gap-3">
+                <EditProjectButton icon={Paintbrush} label="Estilos" />
+                <EditProjectButton icon={Settings} label="Configurações" />
+              </div>
+            </section>
+
+            <section className="border-t border-border p-4">
+              <button
+                type="button"
+                className="w-full rounded-xl border border-border bg-white px-4 py-4 text-center transition-colors hover:border-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <span className="block text-sm font-bold text-foreground">Botão personalizado</span>
+                <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                  Personalize o call-to-action do seu projeto
+                </span>
+              </button>
+            </section>
+          </div>
+        </aside>
+      </form>
+
+      {finalizeOpen && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 px-4 py-8"
+          onClick={() => {
+            if (saving === null) setFinalizeOpen(false);
+          }}
+        >
+          <div
+            className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-border bg-white px-6 py-4">
+              <div>
+                <h2 className="text-xl font-bold text-foreground">
+                  {finalizeMode === 'draft' ? 'Salvar rascunho' : finalizeMode === 'save' ? 'Finalizar alterações' : 'Publicar projeto'}
+                </h2>
+                <p className="text-sm text-muted-foreground mt-0.5">Preencha os detalhes finais antes de continuar.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFinalizeOpen(false)}
+                disabled={saving !== null}
+                className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                aria-label="Fechar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-7 p-6">
+              {formError && (
+                <div className="text-sm rounded-xl p-4 font-medium bg-red-50 text-red-700">{formError}</div>
+              )}
+              {fileError && (
+                <div className="text-sm rounded-xl p-4 font-medium bg-red-50 text-red-700">{fileError}</div>
+              )}
+
+              <div>
+                <label className="block text-sm font-bold text-foreground mb-3">Imagem de capa</label>
+                <div
+                  onClick={() => coverInputRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={onCoverDrop}
+                  className={cn(
+                    'relative w-full aspect-[21/9] rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-colors',
+                    (coverPreview || coverImageUrl) ? 'border-transparent' : isDragging ? 'border-primary bg-primary/5' : 'border-input bg-muted hover:border-primary/60 hover:bg-primary/5'
+                  )}
+                >
+                  {(coverPreview || coverImageUrl) ? (
+                    <img src={coverPreview || coverImageUrl} alt="Prévia da capa" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="text-center text-muted-foreground">
+                      <UploadCloud className="w-8 h-8 mx-auto mb-2" />
+                      <span className="text-sm font-medium">Arraste uma imagem ou clique para enviar</span>
+                    </div>
+                  )}
+                  {coverUploading && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                      <Loader2 className="w-8 h-8 text-white animate-spin" />
+                    </div>
+                  )}
+                </div>
+                <input
+                  type="file"
+                  ref={coverInputRef}
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={onCoverInputChange}
+                  className="hidden"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-foreground mb-2">Título do projeto</label>
+                <Input
+                  required
+                  value={title}
+                  onChange={(e) => onTitleChange(e.target.value)}
+                  placeholder="Ex: Identidade visual — Café Lumen"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-foreground mb-2">Endereço do projeto</label>
+                <div className="flex items-center rounded-xl border border-input bg-background shadow-sm focus-within:ring-2 focus-within:ring-ring overflow-hidden">
+                  <span className="pl-4 text-sm text-muted-foreground shrink-0">portsy.app/@{user.username}/</span>
+                  <input
+                    value={slugValue}
+                    onChange={(e) => { setSlugTouched(true); setSlugValue(slugify(e.target.value)); }}
+                    className="flex-1 min-w-0 h-10 pr-4 py-2 text-sm bg-transparent outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-foreground mb-2">Tags</label>
+                <div className="flex flex-wrap items-center gap-2 p-2 rounded-xl border border-input bg-background shadow-sm focus-within:ring-2 focus-within:ring-ring">
+                  {tags.map((tag) => (
+                    <Badge key={tag} variant="secondary" className="gap-1 pr-1.5">
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => setTags((t) => t.filter((x) => x !== tag))}
+                        className="hover:opacity-70"
+                        aria-label={`Remover tag ${tag}`}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                  <input
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={onTagInputKeyDown}
+                    onBlur={addTag}
+                    placeholder={tags.length === 0 ? 'Adicionar tag' : ''}
+                    className="flex-1 min-w-[100px] h-7 text-sm bg-transparent outline-none px-1"
+                  />
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2.5 text-sm font-medium text-foreground cursor-pointer w-fit">
                 <input
                   type="checkbox"
                   checked={isPublic}
@@ -794,10 +961,29 @@ export default function ProjectFormPage() {
                 />
                 Permitir acesso público sem login
               </label>
-            </Card>
+            </div>
+
+            <div className="sticky bottom-0 flex justify-end gap-3 border-t border-border bg-white px-6 py-4">
+              <Button type="button" variant="outline" disabled={saving !== null} onClick={() => setFinalizeOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                disabled={saving !== null || uploadsPending}
+                onClick={() => submit(finalizeMode === 'draft' ? false : isPublic, finalizeMode)}
+              >
+                {saving !== null
+                  ? 'Salvando...'
+                  : finalizeMode === 'draft'
+                    ? 'Salvar rascunho'
+                    : finalizeMode === 'save'
+                      ? 'Salvar alterações'
+                      : 'Publicar projeto'}
+              </Button>
+            </div>
           </div>
-        </aside>
-      </form>
+        </div>
+      )}
       </div>
     </div>
   );

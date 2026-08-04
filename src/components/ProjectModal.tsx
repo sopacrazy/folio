@@ -31,7 +31,7 @@ function ActionIconButton({ onClick, label, active, disabled, children }: Action
       className={cn(
         'w-9 h-9 rounded-full border flex items-center justify-center transition-colors shrink-0',
         active
-          ? 'bg-red-500/20 border-red-500/30 text-red-400'
+          ? 'bg-primary/20 border-primary/30 text-primary'
           : 'border-white/15 text-white/70 hover:text-white hover:bg-white/10',
         disabled && 'opacity-50 cursor-default pointer-events-none'
       )}
@@ -123,10 +123,10 @@ function DesktopSidebar({
         <span
           className={cn(
             'w-11 h-11 rounded-full flex items-center justify-center transition-colors',
-            liked ? 'bg-red-500/20 text-red-400' : 'bg-white/10 hover:bg-white/15'
+            liked ? 'bg-primary/20 text-primary' : 'bg-white/10 hover:bg-white/15'
           )}
         >
-          <Heart className={cn('w-4 h-4', liked && 'fill-red-400')} />
+          <Heart className={cn('w-4 h-4', liked && 'fill-primary')} />
         </span>
         <span className="text-[11px] font-medium tabular-nums">{likeCount}</span>
       </button>
@@ -198,7 +198,7 @@ function MobileActionBar({
         ) : (
           <Button
             size="icon"
-            className="bg-primary hover:bg-primary/90 text-primary-foreground"
+            className="bg-primary hover:bg-primary-hover text-primary-foreground"
             disabled={!isReal || followLoading}
             onClick={onFollowToggle}
             aria-label={isFollowing ? 'Seguindo' : 'Seguir'}
@@ -208,7 +208,7 @@ function MobileActionBar({
           </Button>
         )}
         <ActionIconButton onClick={onLikeToggle} label={liked ? 'Descurtir' : 'Curtir'} active={liked} disabled={!isReal}>
-          <Heart className={cn('w-4 h-4', liked && 'fill-red-500 text-red-500')} />
+          <Heart className={cn('w-4 h-4', liked && 'fill-primary text-primary')} />
         </ActionIconButton>
         <ActionIconButton onClick={onShare} label="Compartilhar">
           <Share2 className="w-4 h-4" />

@@ -27,7 +27,7 @@ function HeroIllustration() {
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
-            <div className="aspect-square rounded-xl bg-gradient-to-br from-orange-200 to-primary/50" />
+            <div className="aspect-square rounded-xl bg-gradient-to-br from-blue-100 to-primary/50" />
             <div className="aspect-square rounded-xl bg-gradient-to-br from-sky-200 to-indigo-300" />
             <div className="aspect-square rounded-xl bg-gradient-to-br from-emerald-200 to-teal-300" />
           </div>
@@ -89,7 +89,7 @@ function DiscoveryHome({ token }: { token: string | null }) {
           <section className="mb-14">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-foreground">Criadores</h2>
-              <Link to="/criadores" className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors">
+              <Link to="/criadores" className="text-sm font-semibold text-primary hover:text-primary-hover transition-colors">
                 Ver todos
               </Link>
             </div>
@@ -114,7 +114,7 @@ function DiscoveryHome({ token }: { token: string | null }) {
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-foreground">Últimos projetos</h2>
-            <Link to="/descobrir" className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors flex items-center gap-1">
+            <Link to="/descobrir" className="text-sm font-semibold text-primary hover:text-primary-hover transition-colors flex items-center gap-1">
               Ver todos os projetos <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>

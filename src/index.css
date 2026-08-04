@@ -4,27 +4,28 @@
 
 :root {
   --radius: 0.75rem;
-  --background: oklch(1 0 0);
-  --foreground: #2c2c2a;
+  --background: #fafafa;
+  --foreground: #191919;
   --card: oklch(1 0 0);
-  --card-foreground: #2c2c2a;
+  --card-foreground: #191919;
   --popover: oklch(1 0 0);
-  --popover-foreground: #2c2c2a;
-  --primary: #d85a30;
+  --popover-foreground: #191919;
+  --primary: #1769ff;
+  --primary-hover: #0f52cc;
   --primary-foreground: #ffffff;
-  --secondary: #f1efe8;
-  --secondary-foreground: #2c2c2a;
-  --muted: #f1efe8;
-  --muted-foreground: #5f5e5a;
-  --accent: #f0997b;
-  --accent-foreground: #2c2c2a;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #191919;
+  --muted: #f5f5f5;
+  --muted-foreground: #6e6e6e;
+  --accent: #eaf1ff;
+  --accent-foreground: #191919;
   /* Fundo/texto de tags e badges (pills de categoria, especialidade etc). */
-  --tag: #faece7;
-  --tag-foreground: #712b13;
+  --tag: #eaf1ff;
+  --tag-foreground: #0f52cc;
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: #d85a30;
+  --ring: #1769ff;
 }
 
 @theme inline {
@@ -36,6 +37,7 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
