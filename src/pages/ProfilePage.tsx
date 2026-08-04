@@ -6,11 +6,14 @@ import EmptyState from '../components/EmptyState';
 import {
   Calendar,
   ExternalLink,
+  Facebook,
   FolderPlus,
   Heart,
+  Instagram,
   Link as LinkIcon,
   Mail,
   MapPin,
+  MessageCircle,
   MoreHorizontal,
   Plus,
   UserPlus,
@@ -42,12 +45,22 @@ function compactNumber(value: number) {
   return new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
 }
 
+function getSocialHref(network: 'instagram' | 'facebook', value?: string) {
+  if (!value) return '';
+  if (value.startsWith('http')) return value;
+  const clean = value.replace(/^@+/, '').replace(/^\/+/, '');
+  return network === 'instagram' ? `https://instagram.com/${clean}` : `https://facebook.com/${clean}`;
+}
+
 function AboutCard({ user }: { user: any }) {
   const portfolioHref = user.portfolioLink
     ? user.portfolioLink.startsWith('http')
       ? user.portfolioLink
       : `https://${user.portfolioLink}`
     : '';
+  const whatsappHref = user.whatsapp ? `https://wa.me/${user.whatsapp}` : '';
+  const instagramHref = getSocialHref('instagram', user.instagram);
+  const facebookHref = getSocialHref('facebook', user.facebook);
 
   return (
     <Card className="rounded-xl">
@@ -77,6 +90,42 @@ function AboutCard({ user }: { user: any }) {
             >
               <LinkIcon className="h-4 w-4 shrink-0" />
               <span className="truncate">{user.portfolioLink}</span>
+              <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+            </a>
+          )}
+          {user.whatsapp && (
+            <a
+              href={whatsappHref}
+              target="_blank"
+              rel="noreferrer"
+              className="flex min-w-0 items-center gap-2 transition-colors hover:text-primary"
+            >
+              <MessageCircle className="h-4 w-4 shrink-0" />
+              <span className="truncate">Chamar no WhatsApp</span>
+              <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+            </a>
+          )}
+          {user.instagram && (
+            <a
+              href={instagramHref}
+              target="_blank"
+              rel="noreferrer"
+              className="flex min-w-0 items-center gap-2 transition-colors hover:text-primary"
+            >
+              <Instagram className="h-4 w-4 shrink-0" />
+              <span className="truncate">Instagram</span>
+              <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+            </a>
+          )}
+          {user.facebook && (
+            <a
+              href={facebookHref}
+              target="_blank"
+              rel="noreferrer"
+              className="flex min-w-0 items-center gap-2 transition-colors hover:text-primary"
+            >
+              <Facebook className="h-4 w-4 shrink-0" />
+              <span className="truncate">Facebook</span>
               <ExternalLink className="h-3.5 w-3.5 shrink-0" />
             </a>
           )}
@@ -317,27 +366,27 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        <div className="mt-8 grid max-w-6xl grid-cols-1 gap-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start">
+        <div className="mt-12 grid w-full grid-cols-1 gap-7 lg:grid-cols-[300px_minmax(0,1fr)] lg:items-start">
           <aside className="order-1 lg:sticky lg:top-24">
             <AboutCard user={user} />
           </aside>
 
-          <main className="order-2 min-w-0">
+          <main className="order-2 min-w-0 pt-12 lg:relative lg:pt-0">
             <Tabs defaultValue="projetos">
-              <TabsList className="mb-6">
+              <TabsList className="mb-7 lg:absolute lg:-top-12 lg:left-0 lg:mb-0">
                 <TabsTrigger value="projetos">Projetos</TabsTrigger>
                 <TabsTrigger value="curtidos">Curtidos</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="projetos">
+              <TabsContent value="projetos" className="mt-0">
                 {visibleProjects.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                     {visibleProjects.map((project: any) => (
                       <ProfileProjectCard key={project.id} project={project} />
                     ))}
                   </div>
                 ) : (
-                  <Card>
+                  <Card className="w-full">
                     <EmptyState
                       icon={FolderPlus}
                       title={isOwnProfile ? 'Você ainda não publicou projetos' : `${user.fullName} ainda não publicou projetos`}
@@ -349,15 +398,15 @@ export default function ProfilePage() {
                 )}
               </TabsContent>
 
-              <TabsContent value="curtidos">
+              <TabsContent value="curtidos" className="mt-0">
                 {likedProjects.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                     {likedProjects.map((project: any) => (
                       <ProfileProjectCard key={project.id} project={project} />
                     ))}
                   </div>
                 ) : (
-                  <Card>
+                  <Card className="w-full">
                     <EmptyState
                       icon={Heart}
                       title="Nenhum projeto curtido ainda"

@@ -18,6 +18,9 @@ interface ProfileFormData {
   coverUrl: string;
   portfolioLink: string;
   contactEmail: string;
+  whatsapp: string;
+  instagram: string;
+  facebook: string;
 }
 
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -30,10 +33,25 @@ const emptyForm: ProfileFormData = {
   coverUrl: '',
   portfolioLink: '',
   contactEmail: '',
+  whatsapp: '',
+  instagram: '',
+  facebook: '',
 };
 
+function normalizeWhatsappInput(value: string) {
+  return value.replace(/\D/g, '').slice(0, 15);
+}
+
+function isValidWhatsappInput(value: string) {
+  return !value || (value.length >= 10 && value.length <= 15);
+}
+
+function normalizeSocialInput(value: string) {
+  return value.trim().replace(/^@+/, '').slice(0, 80);
+}
+
 export default function SettingsProfilePage() {
-  const { user: authUser, token, login } = useAuthStore();
+  const { user: authUser, token, login, updateUser } = useAuthStore();
   const navigate = useNavigate();
   const [form, setForm] = useState<ProfileFormData>(emptyForm);
   const [loading, setLoading] = useState(true);
@@ -62,6 +80,9 @@ export default function SettingsProfilePage() {
             coverUrl: fullProfile.coverUrl ?? '',
             portfolioLink: fullProfile.portfolioLink ?? '',
             contactEmail: fullProfile.contactEmail ?? '',
+            whatsapp: fullProfile.whatsapp ?? '',
+            instagram: fullProfile.instagram ?? '',
+            facebook: fullProfile.facebook ?? '',
           });
         }
       } finally {
@@ -73,7 +94,7 @@ export default function SettingsProfilePage() {
     return () => {
       cancelled = true;
     };
-  }, [authUser]);
+  }, [authUser?.username]);
 
   // A rota /configuracoes já é protegida pelo SettingsLayout (pai) — aqui só
   // garantimos o tipo pro TypeScript, sem duplicar o redirecionamento.
@@ -90,20 +111,39 @@ export default function SettingsProfilePage() {
 
   /** Salva um snapshot do formulário de verdade no backend (usado pelo submit e pelo autosave de foto). */
   const saveProfile = async (data: ProfileFormData) => {
+    const payload = {
+      ...data,
+      whatsapp: normalizeWhatsappInput(data.whatsapp),
+      instagram: normalizeSocialInput(data.instagram),
+      facebook: normalizeSocialInput(data.facebook),
+    };
     const res = await fetch('/api/users/me', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || 'Não foi possível salvar as alterações.');
 
     // Reemitido porque o username (parte do token) pode ter mudado — atualiza
     // token + usuário no header/menu junto.
-    login(body.token, body.user);
+    const nextUser = {
+      ...authUser,
+      ...body.user,
+      whatsapp: payload.whatsapp,
+      instagram: payload.instagram,
+      facebook: payload.facebook,
+    };
+
+    if (payload.username !== authUser.username) {
+      login(body.token, nextUser);
+    } else {
+      updateUser(nextUser);
+    }
+    return payload;
   };
 
   // Foto de capa/avatar salva sozinha assim que o upload termina — não fica
@@ -152,7 +192,12 @@ export default function SettingsProfilePage() {
     setSaving(true);
     setFeedback(null);
     try {
-      await saveProfile(form);
+      const normalizedWhatsapp = normalizeWhatsappInput(form.whatsapp);
+      if (!isValidWhatsappInput(normalizedWhatsapp)) {
+        throw new Error('Informe o WhatsApp no formato internacional, apenas números. Ex: 5591999999999.');
+      }
+      const saved = await saveProfile(form);
+      setForm((current) => ({ ...current, ...saved }));
       setFeedback({ type: 'success', message: 'Perfil atualizado com sucesso.' });
     } catch (err: any) {
       setFeedback({ type: 'error', message: err.message || 'Não foi possível salvar as alterações.' });
@@ -307,6 +352,39 @@ export default function SettingsProfilePage() {
                 value={form.contactEmail}
                 onChange={(e) => setForm((f) => ({ ...f, contactEmail: e.target.value }))}
                 placeholder="email@exemplo.com"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-foreground mb-1.5">WhatsApp</label>
+            <Input
+              type="tel"
+              inputMode="numeric"
+              value={form.whatsapp}
+              onChange={(e) => setForm((f) => ({ ...f, whatsapp: normalizeWhatsappInput(e.target.value) }))}
+              placeholder="5591999999999"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Opcional. Use o formato internacional, apenas números.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-foreground mb-1.5">Instagram</label>
+              <Input
+                value={form.instagram}
+                onChange={(e) => setForm((f) => ({ ...f, instagram: normalizeSocialInput(e.target.value) }))}
+                placeholder="seuusuario"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-foreground mb-1.5">Facebook</label>
+              <Input
+                value={form.facebook}
+                onChange={(e) => setForm((f) => ({ ...f, facebook: normalizeSocialInput(e.target.value) }))}
+                placeholder="seuusuario"
               />
             </div>
           </div>

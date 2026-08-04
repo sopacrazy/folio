@@ -89,5 +89,27 @@ aws dynamodb create-table \
   --billing-mode PAY_PER_REQUEST \
   --region $REGION
 
-echo "Pronto! As 4 tabelas foram criadas (podem levar alguns segundos para ficarem ACTIVE)."
+echo "Criando FolioNotifications..."
+aws dynamodb create-table \
+  --table-name FolioNotifications \
+  --attribute-definitions \
+    AttributeName=notificationId,AttributeType=S \
+    AttributeName=userId,AttributeType=S \
+    AttributeName=createdAt,AttributeType=S \
+  --key-schema AttributeName=notificationId,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST \
+  --global-secondary-indexes \
+    "[
+      {
+        \"IndexName\": \"userId-createdAt-index\",
+        \"KeySchema\": [
+          {\"AttributeName\":\"userId\",\"KeyType\":\"HASH\"},
+          {\"AttributeName\":\"createdAt\",\"KeyType\":\"RANGE\"}
+        ],
+        \"Projection\": {\"ProjectionType\":\"ALL\"}
+      }
+    ]" \
+  --region $REGION
+
+echo "Pronto! As tabelas foram criadas (podem levar alguns segundos para ficarem ACTIVE)."
 echo "Verifique com: aws dynamodb list-tables --region $REGION"
