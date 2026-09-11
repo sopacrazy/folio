@@ -30,7 +30,7 @@ export default function CreatorCard({
   className,
 }: CreatorCardProps) {
   const [liked, setLiked] = useState(isLiked);
-  const profileHref = `/@${handle}`;
+  const profileHref = `/${handle}`;
 
   return (
     <Card className={cn('overflow-hidden p-0 rounded-xl border border-border shadow-none', className)}>

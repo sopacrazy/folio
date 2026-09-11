@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useLocation, useNavigate, Link } from 'react-router';
-import { Check, Copy, Eye, Heart, Pencil, Share2, UserCheck, UserPlus, X } from 'lucide-react';
+import { Camera, Check, Copy, ExternalLink, Eye, Heart, Loader2, MessagesSquare, Pencil, Share2, UserCheck, UserPlus, X } from 'lucide-react';
 import { getProjectByUsernameAndSlug, incrementProjectViewCount } from '../mockData';
 import { useAuthStore } from '../store/auth';
 import { getVideoEmbedUrl } from '../lib/video';
-import type { ProjectBlock } from '../types/project';
+import { uploadFile } from '../lib/upload';
+import { DEFAULT_PROJECT_STYLES, type ProjectBlock, type ProjectStyles } from '../types/project';
 import Lightbox from './Lightbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -17,10 +18,11 @@ interface ActionIconButtonProps {
   label: string;
   active?: boolean;
   disabled?: boolean;
+  isDark: boolean;
   children: React.ReactNode;
 }
 
-function ActionIconButton({ onClick, label, active, disabled, children }: ActionIconButtonProps) {
+function ActionIconButton({ onClick, label, active, disabled, isDark, children }: ActionIconButtonProps) {
   return (
     <button
       type="button"
@@ -32,7 +34,9 @@ function ActionIconButton({ onClick, label, active, disabled, children }: Action
         'w-9 h-9 rounded-full border flex items-center justify-center transition-colors shrink-0',
         active
           ? 'bg-primary/20 border-primary/30 text-primary'
-          : 'border-white/15 text-white/70 hover:text-white hover:bg-white/10',
+          : isDark
+            ? 'border-white/15 text-white/70 hover:text-white hover:bg-white/10'
+            : 'border-border text-muted-foreground hover:text-foreground hover:bg-black/[0.06]',
         disabled && 'opacity-50 cursor-default pointer-events-none'
       )}
     >
@@ -55,6 +59,9 @@ interface SidebarProps {
   onCopyLink: () => void;
   onShare: () => void;
   editHref: string;
+  isDark: boolean;
+  showSpace: boolean;
+  spaceHref: string;
 }
 
 /** Trilha de ações flutuante à direita, fixa em relação ao painel do modal (não
@@ -74,22 +81,29 @@ function DesktopSidebar({
   onCopyLink,
   onShare,
   editHref,
+  isDark,
+  showSpace,
+  spaceHref,
 }: SidebarProps) {
-  const profileHref = `/@${project.user.username}`;
+  const profileHref = `/${project.user.username}`;
+  const textIdle = isDark ? 'text-white/60' : 'text-muted-foreground';
+  const textHover = isDark ? 'hover:text-white' : 'hover:text-foreground';
+  const bubbleBg = isDark ? 'bg-white/10 hover:bg-white/15' : 'bg-black/[0.05] hover:bg-black/[0.08]';
+  const avatarBorder = isDark ? 'border-white/20 group-hover:border-white/40' : 'border-border group-hover:border-foreground/30';
 
   return (
     <aside className="hidden md:flex flex-col items-center gap-5 absolute right-6 top-1/2 -translate-y-1/2 z-30">
       <Link to={profileHref} className="flex flex-col items-center gap-1.5 group">
-        <Avatar className="w-11 h-11 border-2 border-white/20 group-hover:border-white/40 transition-colors">
+        <Avatar className={cn('w-11 h-11 border-2 transition-colors', avatarBorder)}>
           <AvatarImage src={project.user.avatarUrl} alt={project.user.fullName} />
           <AvatarFallback>{project.user.fullName.charAt(0)}</AvatarFallback>
         </Avatar>
-        <span className="text-[11px] font-medium text-white/60 group-hover:text-white transition-colors">Perfil</span>
+        <span className={cn('text-[11px] font-medium transition-colors', textIdle, textHover)}>Perfil</span>
       </Link>
 
       {isOwner ? (
-        <Link to={editHref} className="flex flex-col items-center gap-1.5 text-white/60 hover:text-white transition-colors">
-          <span className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/15 flex items-center justify-center transition-colors">
+        <Link to={editHref} className={cn('flex flex-col items-center gap-1.5 transition-colors', textIdle, textHover)}>
+          <span className={cn('w-11 h-11 rounded-full flex items-center justify-center transition-colors', bubbleBg)}>
             <Pencil className="w-4 h-4" />
           </span>
           <span className="text-[11px] font-medium">Editar</span>
@@ -99,12 +113,12 @@ function DesktopSidebar({
           type="button"
           onClick={onFollowToggle}
           disabled={!isReal || followLoading}
-          className="flex flex-col items-center gap-1.5 text-white/60 hover:text-white transition-colors disabled:opacity-50 disabled:pointer-events-none"
+          className={cn('flex flex-col items-center gap-1.5 transition-colors disabled:opacity-50 disabled:pointer-events-none', textIdle, textHover)}
         >
           <span
             className={cn(
               'w-11 h-11 rounded-full flex items-center justify-center transition-colors',
-              isFollowing ? 'bg-primary text-primary-foreground' : 'bg-white/10 hover:bg-white/15'
+              isFollowing ? 'bg-primary text-primary-foreground' : bubbleBg
             )}
           >
             {isFollowing ? <UserCheck className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
@@ -113,17 +127,26 @@ function DesktopSidebar({
         </button>
       )}
 
+      {showSpace && (
+        <Link to={spaceHref} className={cn('flex flex-col items-center gap-1.5 transition-colors', textIdle, textHover)}>
+          <span className={cn('w-11 h-11 rounded-full flex items-center justify-center transition-colors', bubbleBg)}>
+            <MessagesSquare className="w-4 h-4" />
+          </span>
+          <span className="text-[11px] font-medium">Espaço</span>
+        </Link>
+      )}
+
       <button
         type="button"
         onClick={onLikeToggle}
         disabled={!isReal}
         aria-label={liked ? 'Descurtir' : 'Curtir'}
-        className="flex flex-col items-center gap-1.5 text-white/60 hover:text-white transition-colors disabled:opacity-50 disabled:pointer-events-none"
+        className={cn('flex flex-col items-center gap-1.5 transition-colors disabled:opacity-50 disabled:pointer-events-none', textIdle, textHover)}
       >
         <span
           className={cn(
             'w-11 h-11 rounded-full flex items-center justify-center transition-colors',
-            liked ? 'bg-primary/20 text-primary' : 'bg-white/10 hover:bg-white/15'
+            liked ? 'bg-primary/20 text-primary' : bubbleBg
           )}
         >
           <Heart className={cn('w-4 h-4', liked && 'fill-primary')} />
@@ -134,9 +157,9 @@ function DesktopSidebar({
       <button
         type="button"
         onClick={onShare}
-        className="flex flex-col items-center gap-1.5 text-white/60 hover:text-white transition-colors"
+        className={cn('flex flex-col items-center gap-1.5 transition-colors', textIdle, textHover)}
       >
-        <span className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/15 flex items-center justify-center transition-colors">
+        <span className={cn('w-11 h-11 rounded-full flex items-center justify-center transition-colors', bubbleBg)}>
           <Share2 className="w-4 h-4" />
         </span>
         <span className="text-[11px] font-medium">Compartilhar</span>
@@ -145,15 +168,15 @@ function DesktopSidebar({
       <button
         type="button"
         onClick={onCopyLink}
-        className="flex flex-col items-center gap-1.5 text-white/60 hover:text-white transition-colors"
+        className={cn('flex flex-col items-center gap-1.5 transition-colors', textIdle, textHover)}
       >
-        <span className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/15 flex items-center justify-center transition-colors">
+        <span className={cn('w-11 h-11 rounded-full flex items-center justify-center transition-colors', bubbleBg)}>
           {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
         </span>
         <span className="text-[11px] font-medium">{copied ? 'Copiado' : 'Copiar link'}</span>
       </button>
 
-      <div className="flex flex-col items-center gap-1.5 text-white/40 pt-3 border-t border-white/10 w-full">
+      <div className={cn('flex flex-col items-center gap-1.5 pt-3 border-t w-full', isDark ? 'text-white/40 border-white/10' : 'text-muted-foreground/70 border-border')}>
         <Eye className="w-4 h-4" />
         <span className="text-[11px] font-medium tabular-nums">{project.viewCount.toLocaleString('pt-BR')}</span>
       </div>
@@ -175,22 +198,37 @@ function MobileActionBar({
   onCopyLink,
   onShare,
   editHref,
+  isDark,
+  showSpace,
+  spaceHref,
 }: SidebarProps) {
-  const profileHref = `/@${project.user.username}`;
+  const profileHref = `/${project.user.username}`;
 
   return (
-    <div className="md:hidden sticky top-0 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2.5 bg-neutral-950/95 backdrop-blur border-b border-white/10 flex items-center justify-between gap-2 mb-6">
+    <div
+      className={cn(
+        'md:hidden sticky top-0 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2.5 backdrop-blur border-b flex items-center justify-between gap-2 mb-6',
+        isDark ? 'bg-neutral-950/95 border-white/10' : 'bg-white/95 border-border'
+      )}
+    >
       <Link to={profileHref} className="flex items-center gap-2 min-w-0">
         <Avatar className="w-8 h-8 shrink-0">
           <AvatarImage src={project.user.avatarUrl} alt={project.user.fullName} />
           <AvatarFallback className="text-xs">{project.user.fullName.charAt(0)}</AvatarFallback>
         </Avatar>
-        <span className="text-sm font-semibold text-white truncate">{project.user.fullName}</span>
+        <span className={cn('text-sm font-semibold truncate', isDark ? 'text-white' : 'text-foreground')}>{project.user.fullName}</span>
       </Link>
 
       <div className="flex items-center gap-1.5 shrink-0">
         {isOwner ? (
-          <Button asChild size="icon" variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/20" aria-label="Editar projeto" title="Editar projeto">
+          <Button
+            asChild
+            size="icon"
+            variant="outline"
+            className={isDark ? 'border-white/20 bg-white/10 text-white hover:bg-white/20' : 'border-border bg-black/[0.05] text-foreground hover:bg-black/[0.08]'}
+            aria-label="Editar projeto"
+            title="Editar projeto"
+          >
             <Link to={editHref}>
               <Pencil className="w-4 h-4" />
             </Link>
@@ -207,15 +245,22 @@ function MobileActionBar({
             {isFollowing ? <UserCheck className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
           </Button>
         )}
-        <ActionIconButton onClick={onLikeToggle} label={liked ? 'Descurtir' : 'Curtir'} active={liked} disabled={!isReal}>
+        <ActionIconButton onClick={onLikeToggle} label={liked ? 'Descurtir' : 'Curtir'} active={liked} disabled={!isReal} isDark={isDark}>
           <Heart className={cn('w-4 h-4', liked && 'fill-primary text-primary')} />
         </ActionIconButton>
-        <ActionIconButton onClick={onShare} label="Compartilhar">
+        <ActionIconButton onClick={onShare} label="Compartilhar" isDark={isDark}>
           <Share2 className="w-4 h-4" />
         </ActionIconButton>
-        <ActionIconButton onClick={onCopyLink} label={copied ? 'Link copiado' : 'Copiar link'}>
+        <ActionIconButton onClick={onCopyLink} label={copied ? 'Link copiado' : 'Copiar link'} isDark={isDark}>
           {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
         </ActionIconButton>
+        {showSpace && (
+          <Button asChild size="icon" variant="outline" className={isDark ? 'border-white/20 bg-white/10 text-white hover:bg-white/20' : 'border-border bg-black/[0.05] text-foreground hover:bg-black/[0.08]'} aria-label="Espaço do projeto" title="Espaço do projeto">
+            <Link to={spaceHref}>
+              <MessagesSquare className="w-4 h-4" />
+            </Link>
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -238,7 +283,10 @@ export default function ProjectModal() {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [coverUploading, setCoverUploading] = useState(false);
+  const [coverError, setCoverError] = useState('');
   const viewCounted = useRef(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   // Fecha o modal usando o histórico do navegador: se veio de uma navegação
   // dentro do app (backgroundLocation), "voltar" restaura a página de origem
@@ -420,9 +468,38 @@ export default function ProjectModal() {
     }
   };
 
+  // Troca rápida de capa direto na página pública — sem precisar entrar no
+  // editor completo. Só existe pro dono de um projeto real (mock não persiste).
+  const handleCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !project || source !== 'real') return;
+    setCoverError('');
+    setCoverUploading(true);
+    try {
+      const url = await uploadFile(file, token, 'projects');
+      const res = await fetch(`/api/projects/${project.id}/cover`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ coverImageUrl: url }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Não foi possível atualizar a capa.');
+      setProject((p: any) => ({ ...p, coverImageUrl: url }));
+    } catch (err: any) {
+      setCoverError(err.message || 'Não foi possível atualizar a capa.');
+    } finally {
+      setCoverUploading(false);
+    }
+  };
+
   const isOwner = currentUser?.id === project?.ownerId;
   const isReal = source === 'real';
-  const editHref = `/@${username}/${slug}/editar`;
+  const isCollaborator = Boolean(
+    currentUser && project?.collaborators?.some((c: any) => c.id === currentUser.id)
+  );
+  const editHref = `/${username}/${slug}/editar`;
+  const spaceHref = `/${username}/${slug}/espaco`;
   // Projetos reais são montados com blocos; os dados mock (demonstração) ainda
   // usam o formato antigo (galeria + descrição) — os dois são suportados aqui.
   const blocks: ProjectBlock[] = project?.blocks ?? [];
@@ -433,40 +510,59 @@ export default function ProjectModal() {
     : gallery;
   const notFound = !loading && (!project || (!project.isPublic && !isOwner));
 
+  const projectStyles: ProjectStyles = project?.styles ?? DEFAULT_PROJECT_STYLES;
+  const isDark = projectStyles.theme === 'dark';
+  const contentMaxWidthClass =
+    projectStyles.width === 'narrow' ? 'max-w-2xl' : projectStyles.width === 'wide' ? 'max-w-5xl' : 'max-w-3xl';
+  const accentStyle = { '--primary': projectStyles.accentColor } as React.CSSProperties;
+
   return (
     <div className="fixed inset-0 z-[70] bg-black/50 md:flex md:items-center md:justify-center" onClick={close}>
       <div
-        className="relative bg-neutral-950/60 backdrop-blur-md w-full h-full md:w-[97%] md:h-[97%] md:rounded-2xl md:shadow-2xl overflow-hidden flex flex-col"
+        className={cn(
+          'relative w-full h-full md:w-[97%] md:h-[97%] md:rounded-2xl md:shadow-2xl overflow-hidden flex flex-col backdrop-blur-md',
+          isDark ? 'bg-neutral-950/60' : 'bg-white/95'
+        )}
+        style={accentStyle}
         onClick={(e) => e.stopPropagation()}
       >
         <button
           type="button"
           onClick={close}
           aria-label="Fechar"
-          className="absolute top-4 right-4 z-40 w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-sm text-white flex items-center justify-center transition-colors"
+          className={cn(
+            'absolute top-4 right-4 z-40 w-9 h-9 rounded-full backdrop-blur-sm flex items-center justify-center transition-colors',
+            isDark ? 'bg-black/40 hover:bg-black/60 text-white' : 'bg-white/80 hover:bg-white text-foreground border border-border'
+          )}
         >
           <X className="w-5 h-5" />
         </button>
 
         <div className="overflow-y-auto flex-1">
           {loading ? (
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 md:pr-28 py-8">
-              <Skeleton className="h-7 w-2/3 mb-3 bg-white/10" />
+            <div className={cn(contentMaxWidthClass, 'mx-auto px-4 sm:px-6 md:pr-28 py-8')}>
+              <Skeleton className={cn('h-7 w-2/3 mb-3', isDark ? 'bg-white/10' : 'bg-black/5')} />
               <div className="flex items-center gap-2 mb-6">
-                <Skeleton className="w-7 h-7 rounded-full bg-white/10" />
-                <Skeleton className="h-4 w-40 bg-white/10" />
+                <Skeleton className={cn('w-7 h-7 rounded-full', isDark ? 'bg-white/10' : 'bg-black/5')} />
+                <Skeleton className={cn('h-4 w-40', isDark ? 'bg-white/10' : 'bg-black/5')} />
               </div>
-              <Skeleton className="w-full h-80 rounded-2xl mb-4 bg-white/10" />
-              <Skeleton className="w-full h-80 rounded-2xl bg-white/10" />
+              <Skeleton className={cn('w-full h-80 rounded-2xl mb-4', isDark ? 'bg-white/10' : 'bg-black/5')} />
+              <Skeleton className={cn('w-full h-80 rounded-2xl', isDark ? 'bg-white/10' : 'bg-black/5')} />
             </div>
           ) : notFound ? (
             <div className="min-h-[50vh] flex flex-col items-center justify-center text-center px-4">
-              <h1 className="text-xl font-bold text-white mb-2">Projeto não encontrado</h1>
-              <p className="text-white/60 mb-6">Esse projeto não existe ou não está mais disponível.</p>
-              <Button variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/20" onClick={close}>Fechar</Button>
+              <h1 className={cn('text-xl font-bold mb-2', isDark ? 'text-white' : 'text-foreground')}>Projeto não encontrado</h1>
+              <p className={cn('mb-6', isDark ? 'text-white/60' : 'text-muted-foreground')}>Esse projeto não existe ou não está mais disponível.</p>
+              <Button
+                variant="outline"
+                className={isDark ? 'border-white/20 bg-white/10 text-white hover:bg-white/20' : ''}
+                onClick={close}
+              >
+                Fechar
+              </Button>
             </div>
           ) : (
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 md:pr-28 py-8">
+            <div className={cn(contentMaxWidthClass, 'mx-auto px-4 sm:px-6 md:pr-28 py-8')}>
               {!project.isPublic && (
                 <div className="bg-tag text-tag-foreground text-sm font-medium text-center py-2 -mx-4 sm:-mx-6 mb-6">
                   Este projeto é um rascunho — só você consegue vê-lo.
@@ -487,34 +583,62 @@ export default function ProjectModal() {
                 onCopyLink={handleCopyLink}
                 onShare={handleShare}
                 editHref={editHref}
+                isDark={isDark}
+                showSpace={isOwner || isCollaborator}
+                spaceHref={spaceHref}
               />
+
+              {coverError && (
+                <div className="text-sm rounded-xl p-3 mb-4 font-medium bg-red-50 text-red-700">{coverError}</div>
+              )}
 
               {/* Título — a capa entra só como miniatura aqui; quem "abre pra
                   visualizar" (lightbox) é a galeria, não ela. */}
               <div className="flex items-start gap-4 mb-4">
-                <div className="w-16 h-16 rounded-xl bg-white/5 overflow-hidden shrink-0 flex items-center justify-center">
+                <div className={cn('relative w-16 h-16 rounded-xl overflow-hidden shrink-0 flex items-center justify-center', isDark ? 'bg-white/5' : 'bg-black/[0.03]')}>
                   <img
                     src={project.coverImageUrl}
                     alt=""
                     className="max-w-full max-h-full object-contain"
                   />
+                  {isOwner && isReal && (
+                    <button
+                      type="button"
+                      onClick={() => coverInputRef.current?.click()}
+                      disabled={coverUploading}
+                      aria-label="Alterar capa"
+                      title="Alterar capa"
+                      className="absolute inset-0 flex items-center justify-center bg-black/50 text-white opacity-0 transition-opacity hover:opacity-100 disabled:opacity-100"
+                    >
+                      {coverUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                    </button>
+                  )}
                 </div>
                 <div className="min-w-0 pt-0.5">
-                  <h1 className="text-2xl font-semibold text-white mb-2">{project.title}</h1>
-                  <Link to={`/@${project.user.username}`} className="inline-flex items-center gap-2 group">
+                  <h1 className={cn('text-2xl font-semibold mb-2', isDark ? 'text-white' : 'text-foreground')}>{project.title}</h1>
+                  <Link to={`/${project.user.username}`} className="inline-flex items-center gap-2 group">
                     <Avatar className="w-6 h-6 shrink-0">
                       <AvatarImage src={project.user.avatarUrl} alt={project.user.fullName} />
                       <AvatarFallback className="text-xs">{project.user.fullName.charAt(0)}</AvatarFallback>
                     </Avatar>
-                    <span className="text-sm font-medium text-white/80 group-hover:text-white transition-colors">
+                    <span className={cn('text-sm font-medium transition-colors', isDark ? 'text-white/80 group-hover:text-white' : 'text-foreground/80 group-hover:text-foreground')}>
                       {project.user.fullName}
                     </span>
-                    <span className="text-sm text-white/40">
+                    <span className={cn('text-sm', isDark ? 'text-white/40' : 'text-muted-foreground/70')}>
                       · publicado em {new Date(project.createdAt).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}
                     </span>
                   </Link>
                 </div>
               </div>
+              {isOwner && isReal && (
+                <input
+                  type="file"
+                  ref={coverInputRef}
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleCoverFileChange}
+                  className="hidden"
+                />
+              )}
 
               {/* Tags */}
               {project.tags?.length > 0 && (
@@ -523,6 +647,19 @@ export default function ProjectModal() {
                     <Badge key={tag} variant="secondary">{tag}</Badge>
                   ))}
                 </div>
+              )}
+
+              {/* Botão de call-to-action personalizado, quando configurado no editor. */}
+              {project.customButtonLabel && project.customButtonUrl && (
+                <a
+                  href={project.customButtonUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mb-6 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
+                >
+                  {project.customButtonLabel}
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
               )}
 
               {/* Conteúdo do projeto — blocos (imagem, grade, texto, vídeo) na
@@ -585,7 +722,7 @@ export default function ProjectModal() {
                       if (block.type === 'text') {
                         if (!block.content) return null;
                         return (
-                          <p key={block.id} className="text-white/70 leading-relaxed whitespace-pre-wrap">
+                          <p key={block.id} className={cn('leading-relaxed whitespace-pre-wrap', isDark ? 'text-white/70' : 'text-foreground/70')}>
                             {block.content}
                           </p>
                         );
@@ -634,7 +771,7 @@ export default function ProjectModal() {
                   )}
 
                   {project.description && (
-                    <p className="text-white/70 leading-relaxed whitespace-pre-wrap">{project.description}</p>
+                    <p className={cn('leading-relaxed whitespace-pre-wrap', isDark ? 'text-white/70' : 'text-foreground/70')}>{project.description}</p>
                   )}
                 </>
               )}
@@ -657,6 +794,9 @@ export default function ProjectModal() {
             onCopyLink={handleCopyLink}
             onShare={handleShare}
             editHref={editHref}
+            isDark={isDark}
+            showSpace={isOwner || isCollaborator}
+            spaceHref={spaceHref}
           />
         )}
       </div>

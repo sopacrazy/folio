@@ -58,7 +58,7 @@ function DiscoveryHome({ token }: { token: string | null }) {
               Explore projetos, encontre criadores e publique um portfólio visual para mostrar seu trabalho com presença.
             </p>
             <div className="mt-10">
-              <Button asChild size="lg" className="rounded-full bg-white px-9 text-primary shadow-xl hover:bg-white/90">
+              <Button asChild size="lg" className="rounded-xl bg-white px-9 text-primary shadow-xl hover:bg-white/90">
                 <Link to="/criadores">
                   Começar <ArrowRight className="w-4 h-4" />
                 </Link>
@@ -70,7 +70,7 @@ function DiscoveryHome({ token }: { token: string | null }) {
             {latestProjects.slice(0, 6).map((project: any, index) => (
               <Link
                 key={project.id}
-                to={`/@${project.user?.username}/${project.slug}`}
+                to={`/${project.user?.username}/${project.slug}`}
                 className="group relative overflow-hidden rounded-t-xl bg-white/15"
               >
                 <img
@@ -81,7 +81,7 @@ function DiscoveryHome({ token }: { token: string | null }) {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
                 <span className="absolute bottom-3 left-3 right-3 line-clamp-1 text-sm font-bold">{project.title}</span>
                 {index === 0 && (
-                  <span className="absolute right-3 top-3 rounded-full bg-white/90 px-2 py-1 text-xs font-bold text-primary">
+                  <span className="absolute right-3 top-3 rounded-xl bg-white/90 px-2 py-1 text-xs font-bold text-primary">
                     Novo
                   </span>
                 )}
@@ -261,7 +261,7 @@ function FollowingFeed({ token }: { token: string | null }) {
                       )}
                     >
                       {label}
-                      {active && <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary" />}
+                      {active && <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-xl bg-primary" />}
                     </button>
                   );
                 })}
@@ -303,7 +303,7 @@ function FollowingFeed({ token }: { token: string | null }) {
                 type="button"
                 onClick={() => setSearchTerm(category)}
                 className={cn(
-                  'group flex h-11 shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-bold transition-colors',
+                  'group flex h-11 shrink-0 items-center gap-2 rounded-xl border px-4 text-sm font-bold transition-colors',
                   searchTerm === category
                     ? 'border-primary bg-primary text-white'
                     : 'border-border bg-white text-foreground hover:border-primary hover:text-primary'
@@ -329,7 +329,7 @@ function FollowingFeed({ token }: { token: string | null }) {
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
               <div
                 key={i}
@@ -350,7 +350,7 @@ function FollowingFeed({ token }: { token: string | null }) {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {sortedProjects.map((project: any) => (
               <div key={project.id} className="min-w-0">
                 <FeedProjectCard project={project} />

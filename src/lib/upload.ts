@@ -1,3 +1,5 @@
+import { formatUploadLimitError, resolveUploadKind, UPLOAD_LIMITS_BYTES } from '../config/uploadLimits';
+
 export type UploadFolder = 'avatars' | 'projects';
 export type UploadStatus = 'optimizing' | 'uploading';
 export interface UploadOptions {
@@ -5,7 +7,6 @@ export interface UploadOptions {
   purpose?: 'profile-cover';
 }
 
-const SERVER_UPLOAD_LIMIT_BYTES = 15 * 1024 * 1024;
 const JPEG_QUALITY = 0.85;
 
 function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number) {
@@ -74,11 +75,20 @@ export async function uploadFile(
   onStatus?: (status: UploadStatus) => void,
   options?: UploadOptions
 ): Promise<string> {
+  const kind = resolveUploadKind(folder, options?.purpose);
+  const limitBytes = UPLOAD_LIMITS_BYTES[kind];
+
+  // Checa o tamanho original antes de gastar tempo comprimindo — um arquivo
+  // já fora do limite não precisa passar pelo canvas.
+  if (file.size > limitBytes) {
+    throw new Error(formatUploadLimitError(kind));
+  }
+
   onStatus?.('optimizing');
   const optimizedFile = await optimizeImage(file, folder, options);
 
-  if (optimizedFile.size > SERVER_UPLOAD_LIMIT_BYTES) {
-    throw new Error('Imagem muito grande mesmo após compressão. Tente uma imagem menor.');
+  if (optimizedFile.size > limitBytes) {
+    throw new Error(formatUploadLimitError(kind));
   }
 
   const formData = new FormData();
@@ -95,7 +105,7 @@ export async function uploadFile(
 
   if (!res.ok) {
     if (res.status === 413) {
-      throw new Error('Imagem muito grande mesmo após compressão. Tente uma imagem menor.');
+      throw new Error(formatUploadLimitError(kind));
     }
     const data = await res.json().catch(() => null);
     throw new Error(data?.error || `Falha ao enviar a imagem (HTTP ${res.status}).`);

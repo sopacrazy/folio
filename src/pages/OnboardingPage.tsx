@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { Check, Loader2, RefreshCw, UploadCloud } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { uploadFile, type UploadStatus } from '../lib/upload';
+import { UPLOAD_LIMITS_MB } from '../config/uploadLimits';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -231,8 +232,8 @@ export default function OnboardingPage() {
             <span>Configuração inicial</span>
             <span>{step} de {steps.length}</span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-white">
-            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progress}%` }} />
+          <div className="h-2 overflow-hidden rounded-xl bg-white">
+            <div className="h-full rounded-xl bg-primary transition-all" style={{ width: `${progress}%` }} />
           </div>
           <div className="mt-3 grid grid-cols-4 gap-2 text-xs font-semibold text-muted-foreground">
             {steps.map((label, index) => (
@@ -303,6 +304,7 @@ export default function OnboardingPage() {
                     <Button type="button" variant="outline" className="mt-4" onClick={() => avatarInputRef.current?.click()}>
                       <UploadCloud className="h-4 w-4" /> Enviar imagem
                     </Button>
+                    <p className="mt-1.5 text-xs text-muted-foreground">Máximo {UPLOAD_LIMITS_MB.avatar}MB</p>
                     <input ref={avatarInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={uploadAvatar} />
                   </div>
                   <div className="flex-1">
@@ -351,6 +353,7 @@ export default function OnboardingPage() {
                     )}
                   </button>
                   <input ref={coverInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={uploadCover} />
+                  <p className="mt-1.5 text-xs text-muted-foreground">Máximo {UPLOAD_LIMITS_MB.profileCover}MB</p>
                 </div>
                 <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {defaultCovers.map((url, index) => (
