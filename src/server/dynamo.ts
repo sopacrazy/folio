@@ -17,4 +17,8 @@ export const TABLES = {
   follows: 'FolioFollows',
   likes: 'FolioLikes',
   notifications: 'FolioNotifications',
+  projectMessages: 'FolioProjectMessages',
+  projectTasks: 'FolioProjectTasks',
+  directMessages: 'FolioDirectMessages',
+  conversations: 'FolioConversations',
 } as const;

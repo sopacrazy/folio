@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { Heart } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
+import CollaboratorAvatars from './CollaboratorAvatars';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 
@@ -15,7 +16,7 @@ interface FeedProjectCardProps {
  * é o que cria o efeito escalonado quando renderizado dentro do masonry.
  */
 export default function FeedProjectCard({ project }: FeedProjectCardProps) {
-  const href = `/@${project.user?.username}/${project.slug}`;
+  const href = `/${project.user?.username}/${project.slug}`;
   const isReal = project.source !== 'mock';
   const { token } = useAuthStore();
   const navigate = useNavigate();
@@ -25,6 +26,7 @@ export default function FeedProjectCard({ project }: FeedProjectCardProps) {
 
   const [liked, setLiked] = useState(Boolean(project.likedByMe));
   const [likeCount, setLikeCount] = useState(project.likeCount || 0);
+  const allCreators = project.user ? [project.user, ...(project.collaborators ?? [])] : (project.collaborators ?? []);
 
   useEffect(() => {
     setLiked(Boolean(project.likedByMe));
@@ -88,13 +90,17 @@ export default function FeedProjectCard({ project }: FeedProjectCardProps) {
       <div className="p-4">
         <h3 className="mb-2.5 line-clamp-1 text-sm font-bold text-foreground">{project.title}</h3>
         <div className="flex items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <Avatar className="w-6 h-6 shrink-0">
-              <AvatarImage src={project.user?.avatarUrl} alt="" />
-              <AvatarFallback className="text-[10px]">{project.user?.fullName?.charAt(0)}</AvatarFallback>
-            </Avatar>
-            <span className="truncate text-xs text-muted-foreground">{project.user?.fullName}</span>
-          </div>
+          {allCreators.length > 1 ? (
+            <CollaboratorAvatars creators={allCreators} />
+          ) : (
+            <div className="flex min-w-0 items-center gap-2">
+              <Avatar className="w-6 h-6 shrink-0">
+                <AvatarImage src={project.user?.avatarUrl} alt="" />
+                <AvatarFallback className="text-[10px]">{project.user?.fullName?.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <span className="truncate text-xs text-muted-foreground">{project.user?.fullName}</span>
+            </div>
+          )}
           <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
             <Heart className="w-3.5 h-3.5" /> {likeCount}
           </span>

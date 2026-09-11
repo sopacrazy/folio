@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { Heart, MessageCircle } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
+import CollaboratorAvatars from './CollaboratorAvatars';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -14,7 +15,7 @@ interface ProjectCardProps {
 }
 
 export default function ProjectCard({ project, compact = false }: ProjectCardProps) {
-  const href = `/@${project.user?.username}/${project.slug}`;
+  const href = `/${project.user?.username}/${project.slug}`;
   const isReal = project.source !== 'mock';
   const { token } = useAuthStore();
   const navigate = useNavigate();
@@ -25,6 +26,7 @@ export default function ProjectCard({ project, compact = false }: ProjectCardPro
 
   const [liked, setLiked] = useState(Boolean(project.likedByMe));
   const [likeCount, setLikeCount] = useState(project.likeCount || 0);
+  const allCreators = project.user ? [project.user, ...(project.collaborators ?? [])] : (project.collaborators ?? []);
 
   useEffect(() => {
     setLiked(Boolean(project.likedByMe));
@@ -89,13 +91,17 @@ export default function ProjectCard({ project, compact = false }: ProjectCardPro
         )}
 
         <div className="flex items-center justify-between mt-3">
-          <Link to={`/@${project.user?.username}`} className="flex items-center gap-2 min-w-0">
-            <Avatar className="w-6 h-6 shrink-0">
-              <AvatarImage src={project.user?.avatarUrl} alt="" />
-              <AvatarFallback className="text-[10px]">{project.user?.fullName?.charAt(0)}</AvatarFallback>
-            </Avatar>
-            <span className="text-xs text-muted-foreground truncate hover:text-foreground transition-colors">{project.user?.fullName}</span>
-          </Link>
+          {allCreators.length > 1 ? (
+            <CollaboratorAvatars creators={allCreators} />
+          ) : (
+            <Link to={`/${project.user?.username}`} className="flex items-center gap-2 min-w-0">
+              <Avatar className="w-6 h-6 shrink-0">
+                <AvatarImage src={project.user?.avatarUrl} alt="" />
+                <AvatarFallback className="text-[10px]">{project.user?.fullName?.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <span className="text-xs text-muted-foreground truncate hover:text-foreground transition-colors">{project.user?.fullName}</span>
+            </Link>
+          )}
 
           <div className="flex items-center gap-3 text-muted-foreground shrink-0">
             <button

@@ -29,7 +29,7 @@ export interface MockProject {
   id: string;
   ownerId: string;
   title: string;
-  /** Único por dono — usado na URL pública /@username/slug. */
+  /** Único por dono — usado na URL pública /username/slug. */
   slug: string;
   description?: string;
   coverImageUrl: string;
@@ -497,7 +497,7 @@ export function getProjectsByUser(userId: string, options?: { includeDrafts?: bo
     .map((p) => projectWithOwner(p));
 }
 
-/** Lookup usado tanto pela página pública (/@user/slug) quanto pelo formulário de edição. */
+/** Lookup usado tanto pela página pública (/user/slug) quanto pelo formulário de edição. */
 export function getProjectByUsernameAndSlug(username: string, slug: string) {
   const user = mockUsers.find((u) => u.username === username);
   if (!user) return null;

@@ -1,17 +1,24 @@
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type FormEvent, type KeyboardEvent } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import {
+  AlertTriangle,
   ArrowLeft,
+  Check,
   GripVertical,
   Image as ImageIcon,
   LayoutGrid,
   Loader2,
+  MessagesSquare,
+  Moon,
   Paintbrush,
   Plus,
+  Search,
   Settings,
+  Sun,
   Trash2,
   Type as TypeIcon,
   UploadCloud,
+  Users,
   Video as VideoIcon,
   X,
 } from 'lucide-react';
@@ -19,7 +26,15 @@ import { useAuthStore } from '../store/auth';
 import { slugify } from '../mockData';
 import { uploadFile, type UploadStatus } from '../lib/upload';
 import { getVideoEmbedUrl } from '../lib/video';
-import type { ProjectBlock, ProjectBlockType } from '../types/project';
+import {
+  ACCENT_COLOR_PRESETS,
+  DEFAULT_PROJECT_STYLES,
+  type ProjectBlock,
+  type ProjectBlockType,
+  type ProjectStyles,
+} from '../types/project';
+import { UPLOAD_LIMITS_MB } from '../config/uploadLimits';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -52,15 +67,569 @@ function AddContentButton({ type, onClick }: { type: ProjectBlockType; onClick: 
   );
 }
 
-function EditProjectButton({ icon: Icon, label }: { icon: typeof Paintbrush; label: string }) {
+function EditProjectButton({
+  icon: Icon,
+  label,
+  onClick,
+  disabled,
+  title,
+}: {
+  icon: typeof Paintbrush;
+  label: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  title?: string;
+}) {
   return (
     <button
       type="button"
-      className="group flex min-h-20 flex-col items-center justify-center rounded-xl border border-border bg-muted/60 px-3 py-4 text-center transition-colors hover:border-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className="group flex min-h-20 flex-col items-center justify-center rounded-xl border border-border bg-muted/60 px-3 py-4 text-center transition-colors hover:border-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-muted/60"
     >
       <Icon className="mb-2 h-5 w-5 text-foreground transition-colors group-hover:text-primary" />
       <span className="text-xs font-semibold leading-tight text-foreground">{label}</span>
     </button>
+  );
+}
+
+const WIDTH_OPTIONS: { value: ProjectStyles['width']; label: string; barWidth: string }[] = [
+  { value: 'narrow', label: 'Estreito', barWidth: '45%' },
+  { value: 'default', label: 'Padrão', barWidth: '70%' },
+  { value: 'wide', label: 'Largo', barWidth: '92%' },
+];
+
+function StylesPanel({
+  open,
+  onClose,
+  styles,
+  onChange,
+  onSave,
+  saving,
+  error,
+}: {
+  open: boolean;
+  onClose: () => void;
+  styles: ProjectStyles;
+  onChange: (patch: Partial<ProjectStyles>) => void;
+  onSave: () => void;
+  saving: boolean;
+  error: string;
+}) {
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 px-4 py-8"
+      onClick={() => {
+        if (!saving) onClose();
+      }}
+    >
+      <div
+        className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-border bg-white px-6 py-4">
+          <div>
+            <h2 className="text-xl font-bold text-foreground">Estilos do projeto</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">Personalize a aparência da página pública deste projeto.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+            aria-label="Fechar"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-7 p-6">
+          {error && (
+            <div className="text-sm rounded-xl p-4 font-medium bg-red-50 text-red-700">{error}</div>
+          )}
+
+          <div>
+            <label className="block text-sm font-bold text-foreground mb-3">Tema</label>
+            <div className="grid grid-cols-2 gap-3">
+              {(
+                [
+                  { value: 'light' as const, label: 'Claro', icon: Sun },
+                  { value: 'dark' as const, label: 'Escuro', icon: Moon },
+                ]
+              ).map(({ value, label, icon: Icon }) => {
+                const selected = styles.theme === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => onChange({ theme: value })}
+                    className={cn(
+                      'relative rounded-xl border-2 p-4 text-left transition-colors',
+                      selected ? 'border-primary' : 'border-border hover:border-primary/50'
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        'mb-3 flex h-14 items-center justify-center rounded-lg',
+                        value === 'light' ? 'bg-white border border-border' : 'bg-neutral-900'
+                      )}
+                    >
+                      <Icon className={cn('h-5 w-5', value === 'light' ? 'text-neutral-800' : 'text-white')} />
+                    </div>
+                    <span className="text-sm font-semibold text-foreground">{label}</span>
+                    {selected && (
+                      <span className="absolute top-2 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                        <Check className="h-3 w-3" />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-foreground mb-3">Largura do conteúdo</label>
+            <div className="grid grid-cols-3 gap-3">
+              {WIDTH_OPTIONS.map(({ value, label, barWidth }) => {
+                const selected = styles.width === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => onChange({ width: value })}
+                    className={cn(
+                      'relative rounded-xl border-2 p-3 text-center transition-colors',
+                      selected ? 'border-primary' : 'border-border hover:border-primary/50'
+                    )}
+                  >
+                    <div className="mb-3 flex h-14 flex-col items-center justify-center rounded-lg bg-muted px-2">
+                      <div className="h-8 rounded-sm bg-primary/70" style={{ width: barWidth }} />
+                    </div>
+                    <span className="text-xs font-semibold text-foreground">{label}</span>
+                    {selected && (
+                      <span className="absolute top-2 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                        <Check className="h-3 w-3" />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-foreground mb-3">Cor de destaque</label>
+            <div className="flex flex-wrap gap-3">
+              {ACCENT_COLOR_PRESETS.map((color) => {
+                const selected = styles.accentColor.toLowerCase() === color.toLowerCase();
+                return (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => onChange({ accentColor: color })}
+                    aria-label={`Cor ${color}`}
+                    title={color}
+                    className={cn(
+                      'h-10 w-10 rounded-full flex items-center justify-center transition-transform hover:scale-105',
+                      selected && 'ring-2 ring-offset-2 ring-primary'
+                    )}
+                    style={{ backgroundColor: color }}
+                  >
+                    {selected && <Check className="h-4 w-4 text-white drop-shadow" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="sticky bottom-0 flex justify-end gap-3 border-t border-border bg-white px-6 py-4">
+          <Button type="button" variant="outline" disabled={saving} onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button type="button" disabled={saving} onClick={onSave}>
+            {saving ? 'Salvando...' : 'Salvar estilos'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface CollaboratorEntry {
+  id: string;
+  username: string;
+  fullName: string;
+  avatarUrl?: string;
+  status: 'pending' | 'accepted' | 'declined';
+}
+
+function CollaboratorStatusBadge({ status }: { status: CollaboratorEntry['status'] }) {
+  if (status === 'accepted') return <Badge variant="secondary" className="bg-emerald-50 text-emerald-700">Colaborador</Badge>;
+  if (status === 'declined') return <Badge variant="secondary" className="bg-red-50 text-red-700">Recusado</Badge>;
+  return <Badge variant="secondary">Convite enviado</Badge>;
+}
+
+interface CollaboratorSuggestion {
+  id: string;
+  username: string;
+  fullName: string;
+  avatarUrl?: string;
+}
+
+function CollaboratorsPanel({
+  open,
+  onClose,
+  collaborators,
+  loading,
+  query,
+  onQueryChange,
+  onInvite,
+  inviting,
+  error,
+  suggestions,
+  suggestionsLoading,
+  onSelectSuggestion,
+}: {
+  open: boolean;
+  onClose: () => void;
+  collaborators: CollaboratorEntry[];
+  loading: boolean;
+  query: string;
+  onQueryChange: (value: string) => void;
+  onInvite: () => void;
+  inviting: boolean;
+  error: string;
+  suggestions: CollaboratorSuggestion[];
+  suggestionsLoading: boolean;
+  onSelectSuggestion: (user: CollaboratorSuggestion) => void;
+}) {
+  if (!open) return null;
+
+  const showDropdown = query.trim().length > 0;
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 px-4 py-8"
+      onClick={() => {
+        if (!inviting) onClose();
+      }}
+    >
+      <div
+        className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-border bg-white px-6 py-4">
+          <div>
+            <h2 className="text-xl font-bold text-foreground">Colaboradores</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">Convide outros criadores para este projeto.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            aria-label="Fechar"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-5 p-6">
+          {error && (
+            <div className="text-sm rounded-xl p-4 font-medium bg-red-50 text-red-700">{error}</div>
+          )}
+
+          <div className="relative flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => onQueryChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    onInvite();
+                  }
+                }}
+                placeholder="Buscar criador por @usuário"
+                className="pl-9"
+                autoComplete="off"
+              />
+
+              {showDropdown && (
+                <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-xl border border-border bg-white shadow-lg">
+                  {suggestionsLoading ? (
+                    <div className="p-3 text-center text-sm text-muted-foreground">Buscando...</div>
+                  ) : suggestions.length === 0 ? (
+                    <div className="p-3 text-center text-sm text-muted-foreground">Nenhum criador encontrado.</div>
+                  ) : (
+                    suggestions.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => onSelectSuggestion(s)}
+                        className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-muted"
+                      >
+                        <Avatar className="h-7 w-7 shrink-0">
+                          <AvatarImage src={s.avatarUrl} alt="" />
+                          <AvatarFallback className="text-xs">{s.fullName?.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <span className="min-w-0 flex-1 truncate">
+                          <span className="block text-sm font-medium text-foreground">{s.fullName}</span>
+                          <span className="block text-xs text-muted-foreground">@{s.username}</span>
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+            <Button type="button" onClick={onInvite} disabled={inviting || !query.trim()}>
+              {inviting ? 'Convidando...' : 'Convidar'}
+            </Button>
+          </div>
+
+          <div className="rounded-xl border border-border divide-y divide-border">
+            {loading ? (
+              <div className="p-4 text-center text-sm text-muted-foreground">Carregando...</div>
+            ) : collaborators.length === 0 ? (
+              <div className="p-4 text-center text-sm text-muted-foreground">Nenhum colaborador convidado ainda.</div>
+            ) : (
+              collaborators.map((c) => (
+                <div key={c.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <Avatar className="h-8 w-8 shrink-0">
+                      <AvatarImage src={c.avatarUrl} alt="" />
+                      <AvatarFallback className="text-xs">{c.fullName?.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <span className="truncate text-sm font-medium text-foreground">@{c.username}</span>
+                  </div>
+                  <CollaboratorStatusBadge status={c.status} />
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SettingsPanel({
+  open,
+  onClose,
+  isPublic,
+  onSaveVisibility,
+  savingVisibility,
+  error,
+  onDelete,
+  deleting,
+}: {
+  open: boolean;
+  onClose: () => void;
+  isPublic: boolean;
+  onSaveVisibility: (next: boolean) => void;
+  savingVisibility: boolean;
+  error: string;
+  onDelete: () => void;
+  deleting: boolean;
+}) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  if (!open) return null;
+
+  const busy = savingVisibility || deleting;
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 px-4 py-8"
+      onClick={() => {
+        if (!busy) onClose();
+      }}
+    >
+      <div
+        className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-border bg-white px-6 py-4">
+          <div>
+            <h2 className="text-xl font-bold text-foreground">Configurações do projeto</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">Visibilidade e outras opções deste projeto.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+            aria-label="Fechar"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-7 p-6">
+          {error && (
+            <div className="text-sm rounded-xl p-4 font-medium bg-red-50 text-red-700">{error}</div>
+          )}
+
+          <div>
+            <label className="block text-sm font-bold text-foreground mb-3">Visibilidade</label>
+            <div className="grid grid-cols-2 gap-3">
+              {(
+                [
+                  { value: true, label: 'Público', desc: 'Qualquer pessoa pode ver.' },
+                  { value: false, label: 'Rascunho', desc: 'Só você consegue ver.' },
+                ]
+              ).map(({ value, label, desc }) => {
+                const selected = isPublic === value;
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onSaveVisibility(value)}
+                    className={cn(
+                      'relative rounded-xl border-2 p-4 text-left transition-colors disabled:opacity-50',
+                      selected ? 'border-primary' : 'border-border hover:border-primary/50'
+                    )}
+                  >
+                    <span className="block text-sm font-semibold text-foreground">{label}</span>
+                    <span className="mt-1 block text-xs text-muted-foreground">{desc}</span>
+                    {selected && (
+                      <span className="absolute top-2 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                        <Check className="h-3 w-3" />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-red-200 bg-red-50/60 p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 shrink-0 text-red-600 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-bold text-red-700">Excluir projeto</p>
+                <p className="mt-1 text-xs text-red-700/80">
+                  Essa ação é permanente. O projeto, curtidas e conversas do espaço de colaboração serão apagados.
+                </p>
+                {confirmingDelete ? (
+                  <div className="mt-3 flex gap-2">
+                    <Button type="button" variant="destructive" size="sm" disabled={deleting} onClick={onDelete}>
+                      {deleting ? 'Excluindo...' : 'Sim, excluir definitivamente'}
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" disabled={deleting} onClick={() => setConfirmingDelete(false)}>
+                      Cancelar
+                    </Button>
+                  </div>
+                ) : (
+                  <Button type="button" variant="destructive" size="sm" className="mt-3" onClick={() => setConfirmingDelete(true)}>
+                    Excluir projeto
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CustomButtonPanel({
+  open,
+  onClose,
+  label,
+  url,
+  onLabelChange,
+  onUrlChange,
+  onSave,
+  onRemove,
+  saving,
+  error,
+}: {
+  open: boolean;
+  onClose: () => void;
+  label: string;
+  url: string;
+  onLabelChange: (value: string) => void;
+  onUrlChange: (value: string) => void;
+  onSave: () => void;
+  onRemove: () => void;
+  saving: boolean;
+  error: string;
+}) {
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 px-4 py-8"
+      onClick={() => {
+        if (!saving) onClose();
+      }}
+    >
+      <div
+        className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-border bg-white px-6 py-4">
+          <div>
+            <h2 className="text-xl font-bold text-foreground">Botão personalizado</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Adicione um call-to-action (ex: "Visitar site") na página pública do projeto.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+            aria-label="Fechar"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-5 p-6">
+          {error && (
+            <div className="text-sm rounded-xl p-4 font-medium bg-red-50 text-red-700">{error}</div>
+          )}
+
+          <div>
+            <label className="block text-sm font-bold text-foreground mb-2">Texto do botão</label>
+            <Input value={label} onChange={(e) => onLabelChange(e.target.value)} placeholder="Ex: Visitar site" maxLength={40} />
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-foreground mb-2">Link</label>
+            <Input value={url} onChange={(e) => onUrlChange(e.target.value)} placeholder="https://..." />
+          </div>
+        </div>
+
+        <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-border bg-white px-6 py-4">
+          <button
+            type="button"
+            onClick={onRemove}
+            disabled={saving || (!label && !url)}
+            className="text-sm font-semibold text-red-600 hover:text-red-700 disabled:opacity-40"
+          >
+            Remover botão
+          </button>
+          <div className="flex gap-3">
+            <Button type="button" variant="outline" disabled={saving} onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button type="button" disabled={saving} onClick={onSave}>
+              {saving ? 'Salvando...' : 'Salvar'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -194,6 +763,7 @@ function ImageBlockEditor({
           if (file) onFile(file);
         }}
       />
+      <p className="mt-1.5 text-xs text-muted-foreground">Máximo {UPLOAD_LIMITS_MB.projectImage}MB</p>
     </div>
   );
 }
@@ -262,6 +832,7 @@ function GridBlockEditor({
           if (files.length > 0) onFiles(files);
         }}
       />
+      <p className="mt-1.5 text-xs text-muted-foreground">Máximo {UPLOAD_LIMITS_MB.projectImage}MB por imagem</p>
     </div>
   );
 }
@@ -329,6 +900,33 @@ export default function ProjectFormPage() {
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [finalizeMode, setFinalizeMode] = useState<'draft' | 'publish' | 'save'>('publish');
 
+  const [projectStyles, setProjectStyles] = useState<ProjectStyles>(DEFAULT_PROJECT_STYLES);
+  const [stylesOpen, setStylesOpen] = useState(false);
+  const [stylesSaving, setStylesSaving] = useState(false);
+  const [stylesError, setStylesError] = useState('');
+
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsError, setSettingsError] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  const [customButtonLabel, setCustomButtonLabel] = useState('');
+  const [customButtonUrl, setCustomButtonUrl] = useState('');
+  const [draftButtonLabel, setDraftButtonLabel] = useState('');
+  const [draftButtonUrl, setDraftButtonUrl] = useState('');
+  const [buttonOpen, setButtonOpen] = useState(false);
+  const [buttonSaving, setButtonSaving] = useState(false);
+  const [buttonError, setButtonError] = useState('');
+
+  const [collabOpen, setCollabOpen] = useState(false);
+  const [collabList, setCollabList] = useState<CollaboratorEntry[]>([]);
+  const [collabLoading, setCollabLoading] = useState(false);
+  const [collabQuery, setCollabQuery] = useState('');
+  const [collabInviting, setCollabInviting] = useState(false);
+  const [collabError, setCollabError] = useState('');
+  const [collabSuggestions, setCollabSuggestions] = useState<CollaboratorSuggestion[]>([]);
+  const [collabSuggestionsLoading, setCollabSuggestionsLoading] = useState(false);
+
   const [blocks, setBlocks] = useState<ProjectBlock[]>([]);
   const [blockUploads, setBlockUploads] = useState<Record<string, PendingUpload[]>>({});
   const [draggedBlockId, setDraggedBlockId] = useState<string | null>(null);
@@ -369,6 +967,9 @@ export default function ProjectFormPage() {
             setBlocks(existing.blocks ?? []);
             setIsPublic(existing.isPublic);
             setWasPublished(existing.isPublic);
+            setProjectStyles(existing.styles ?? DEFAULT_PROJECT_STYLES);
+            setCustomButtonLabel(existing.customButtonLabel ?? '');
+            setCustomButtonUrl(existing.customButtonUrl ?? '');
             setLoading(false);
           }
           return;
@@ -384,6 +985,42 @@ export default function ProjectFormPage() {
       cancelled = true;
     };
   }, [isEditMode, handle, editingSlug, user]);
+
+  // Autocompletar do painel de Colaboradores — busca ao digitar (debounced),
+  // no máximo 10 sugestões, excluindo o próprio usuário e quem já está na lista.
+  useEffect(() => {
+    if (!collabOpen) return;
+    const q = collabQuery.trim().replace(/^@+/, '');
+    if (!q) {
+      setCollabSuggestions([]);
+      setCollabSuggestionsLoading(false);
+      return;
+    }
+
+    setCollabSuggestionsLoading(true);
+    let cancelled = false;
+    const handle = window.setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/users?search=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        if (cancelled) return;
+        const existingIds = new Set(collabList.map((c) => c.id));
+        const filtered = (Array.isArray(data) ? data : [])
+          .filter((u: CollaboratorSuggestion) => u.id !== user?.id && !existingIds.has(u.id))
+          .slice(0, 10);
+        setCollabSuggestions(filtered);
+      } catch {
+        if (!cancelled) setCollabSuggestions([]);
+      } finally {
+        if (!cancelled) setCollabSuggestionsLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [collabQuery, collabOpen, collabList, user?.id]);
 
   if (!user) return null;
 
@@ -606,10 +1243,145 @@ export default function ProjectFormPage() {
       if (!res.ok) throw new Error(result.error || 'Não foi possível salvar o projeto.');
 
       setFinalizeOpen(false);
-      navigate(`/@${user.username}/${result.slug}`);
+      navigate(`/${user.username}/${result.slug}`);
     } catch (err: any) {
       setFormError(err.message || 'Não foi possível salvar o projeto.');
       setSaving(null);
+    }
+  };
+
+  const saveStyles = async () => {
+    if (!projectId) return;
+    setStylesError('');
+    setStylesSaving(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/styles`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(projectStyles),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Não foi possível salvar os estilos.');
+      setProjectStyles(result.styles ?? projectStyles);
+      setStylesOpen(false);
+    } catch (err: any) {
+      setStylesError(err.message || 'Não foi possível salvar os estilos.');
+    } finally {
+      setStylesSaving(false);
+    }
+  };
+
+  const saveVisibility = async (next: boolean) => {
+    if (!projectId) return;
+    setSettingsError('');
+    setSettingsSaving(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/visibility`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ isPublic: next }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Não foi possível atualizar a visibilidade.');
+      setIsPublic(next);
+      setWasPublished(next);
+    } catch (err: any) {
+      setSettingsError(err.message || 'Não foi possível atualizar a visibilidade.');
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
+
+  const deleteProject = async () => {
+    if (!projectId) return;
+    setSettingsError('');
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const result = await res.json();
+        throw new Error(result.error || 'Não foi possível excluir o projeto.');
+      }
+      navigate(`/${user.username}`);
+    } catch (err: any) {
+      setSettingsError(err.message || 'Não foi possível excluir o projeto.');
+      setDeleting(false);
+    }
+  };
+
+  const saveCustomButton = async (label: string, url: string) => {
+    if (!projectId) return;
+    setButtonError('');
+    setButtonSaving(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/button`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ label, url }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Não foi possível salvar o botão.');
+      setCustomButtonLabel(result.customButtonLabel ?? '');
+      setCustomButtonUrl(result.customButtonUrl ?? '');
+      setButtonOpen(false);
+    } catch (err: any) {
+      setButtonError(err.message || 'Não foi possível salvar o botão.');
+    } finally {
+      setButtonSaving(false);
+    }
+  };
+
+  const openCollaboratorsPanel = async () => {
+    if (!projectId) return;
+    setCollabError('');
+    setCollabQuery('');
+    setCollabSuggestions([]);
+    setCollabOpen(true);
+    setCollabLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/collaborators`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Não foi possível carregar os colaboradores.');
+      setCollabList(data.collaborators ?? []);
+    } catch (err: any) {
+      setCollabError(err.message || 'Não foi possível carregar os colaboradores.');
+    } finally {
+      setCollabLoading(false);
+    }
+  };
+
+  const inviteCollaborator = async (usernameOverride?: string) => {
+    const rawUsername = usernameOverride ?? collabQuery;
+    if (!projectId || !rawUsername.trim()) return;
+    setCollabError('');
+    setCollabInviting(true);
+    try {
+      const username = rawUsername.trim().replace(/^@+/, '');
+      const res = await fetch(`/api/projects/${projectId}/collaborators`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ username }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Não foi possível convidar esse criador.');
+      setCollabList((list) => [...list, data]);
+      setCollabQuery('');
+      setCollabSuggestions([]);
+    } catch (err: any) {
+      setCollabError(err.message || 'Não foi possível convidar esse criador.');
+    } finally {
+      setCollabInviting(false);
     }
   };
 
@@ -722,7 +1494,7 @@ export default function ProjectFormPage() {
               <div>
                 <label className="block text-sm font-bold text-foreground mb-2">Endereço do projeto</label>
                 <div className="flex items-center rounded-xl border border-input bg-background shadow-sm focus-within:ring-2 focus-within:ring-ring overflow-hidden">
-                  <span className="pl-4 text-sm text-muted-foreground shrink-0">portsy.app/@{user.username}/</span>
+                  <span className="pl-4 text-sm text-muted-foreground shrink-0">portsy.app/{user.username}/</span>
                   <input
                     value={slugValue}
                     onChange={(e) => { setSlugTouched(true); setSlugValue(slugify(e.target.value)); }}
@@ -832,19 +1604,59 @@ export default function ProjectFormPage() {
             <section className="border-t border-border p-4">
               <h2 className="text-sm font-bold text-foreground mb-3">Editar projeto</h2>
               <div className="grid grid-cols-2 gap-3">
-                <EditProjectButton icon={Paintbrush} label="Estilos" />
-                <EditProjectButton icon={Settings} label="Configurações" />
+                <EditProjectButton
+                  icon={Paintbrush}
+                  label="Estilos"
+                  disabled={!projectId}
+                  title={!projectId ? 'Salve o projeto para personalizar os estilos.' : undefined}
+                  onClick={() => {
+                    setStylesError('');
+                    setStylesOpen(true);
+                  }}
+                />
+                <EditProjectButton
+                  icon={Users}
+                  label="Colaboradores"
+                  disabled={!projectId}
+                  title={!projectId ? 'Salve o projeto para convidar colaboradores.' : undefined}
+                  onClick={openCollaboratorsPanel}
+                />
+                <EditProjectButton
+                  icon={Settings}
+                  label="Configurações"
+                  disabled={!projectId}
+                  title={!projectId ? 'Salve o projeto para acessar as configurações.' : undefined}
+                  onClick={() => {
+                    setSettingsError('');
+                    setSettingsOpen(true);
+                  }}
+                />
+                <EditProjectButton
+                  icon={MessagesSquare}
+                  label="Espaço do projeto"
+                  disabled={!projectId}
+                  title={!projectId ? 'Salve o projeto para acessar o espaço de colaboração.' : undefined}
+                  onClick={() => navigate(`/${user.username}/${editingSlug}/espaco`)}
+                />
               </div>
             </section>
 
             <section className="border-t border-border p-4">
               <button
                 type="button"
-                className="w-full rounded-xl border border-border bg-white px-4 py-4 text-center transition-colors hover:border-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                disabled={!projectId}
+                title={!projectId ? 'Salve o projeto para personalizar o botão.' : undefined}
+                onClick={() => {
+                  setButtonError('');
+                  setDraftButtonLabel(customButtonLabel);
+                  setDraftButtonUrl(customButtonUrl);
+                  setButtonOpen(true);
+                }}
+                className="w-full rounded-xl border border-border bg-white px-4 py-4 text-center transition-colors hover:border-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-white"
               >
                 <span className="block text-sm font-bold text-foreground">Botão personalizado</span>
                 <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
-                  Personalize o call-to-action do seu projeto
+                  {customButtonLabel ? `Ativo: "${customButtonLabel}"` : 'Personalize o call-to-action do seu projeto'}
                 </span>
               </button>
             </section>
@@ -925,6 +1737,7 @@ export default function ProjectFormPage() {
                   onChange={onCoverInputChange}
                   className="hidden"
                 />
+                <p className="mt-1.5 text-xs text-muted-foreground">Máximo {UPLOAD_LIMITS_MB.projectImage}MB</p>
               </div>
 
               <div>
@@ -940,7 +1753,7 @@ export default function ProjectFormPage() {
               <div>
                 <label className="block text-sm font-bold text-foreground mb-2">Endereço do projeto</label>
                 <div className="flex items-center rounded-xl border border-input bg-background shadow-sm focus-within:ring-2 focus-within:ring-ring overflow-hidden">
-                  <span className="pl-4 text-sm text-muted-foreground shrink-0">portsy.app/@{user.username}/</span>
+                  <span className="pl-4 text-sm text-muted-foreground shrink-0">portsy.app/{user.username}/</span>
                   <input
                     value={slugValue}
                     onChange={(e) => { setSlugTouched(true); setSlugValue(slugify(e.target.value)); }}
@@ -1008,6 +1821,55 @@ export default function ProjectFormPage() {
           </div>
         </div>
       )}
+
+      <StylesPanel
+        open={stylesOpen}
+        onClose={() => setStylesOpen(false)}
+        styles={projectStyles}
+        onChange={(patch) => setProjectStyles((s) => ({ ...s, ...patch }))}
+        onSave={saveStyles}
+        saving={stylesSaving}
+        error={stylesError}
+      />
+
+      <CollaboratorsPanel
+        open={collabOpen}
+        onClose={() => setCollabOpen(false)}
+        collaborators={collabList}
+        loading={collabLoading}
+        query={collabQuery}
+        onQueryChange={setCollabQuery}
+        onInvite={() => inviteCollaborator()}
+        inviting={collabInviting}
+        error={collabError}
+        suggestions={collabSuggestions}
+        suggestionsLoading={collabSuggestionsLoading}
+        onSelectSuggestion={(u) => inviteCollaborator(u.username)}
+      />
+
+      <SettingsPanel
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        isPublic={isPublic}
+        onSaveVisibility={saveVisibility}
+        savingVisibility={settingsSaving}
+        error={settingsError}
+        onDelete={deleteProject}
+        deleting={deleting}
+      />
+
+      <CustomButtonPanel
+        open={buttonOpen}
+        onClose={() => setButtonOpen(false)}
+        label={draftButtonLabel}
+        url={draftButtonUrl}
+        onLabelChange={setDraftButtonLabel}
+        onUrlChange={setDraftButtonUrl}
+        onSave={() => saveCustomButton(draftButtonLabel, draftButtonUrl)}
+        onRemove={() => saveCustomButton('', '')}
+        saving={buttonSaving}
+        error={buttonError}
+      />
       </div>
     </div>
   );

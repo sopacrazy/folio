@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'r
 import { useNavigate } from 'react-router';
 import { useAuthStore } from '../../store/auth';
 import { uploadFile, type UploadStatus } from '../../lib/upload';
+import { UPLOAD_LIMITS_MB } from '../../config/uploadLimits';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -21,6 +22,8 @@ interface ProfileFormData {
   whatsapp: string;
   instagram: string;
   facebook: string;
+  location: string;
+  category: string;
 }
 
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -36,6 +39,8 @@ const emptyForm: ProfileFormData = {
   whatsapp: '',
   instagram: '',
   facebook: '',
+  location: '',
+  category: '',
 };
 
 function normalizeWhatsappInput(value: string) {
@@ -83,6 +88,8 @@ export default function SettingsProfilePage() {
             whatsapp: fullProfile.whatsapp ?? '',
             instagram: fullProfile.instagram ?? '',
             facebook: fullProfile.facebook ?? '',
+            location: fullProfile.location ?? '',
+            category: fullProfile.category ?? '',
           });
         }
       } finally {
@@ -219,7 +226,7 @@ export default function SettingsProfilePage() {
             <Skeleton className="w-14 h-14 rounded-full shrink-0" />
             <div className="space-y-2">
               <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-8 w-28 rounded-full" />
+              <Skeleton className="h-8 w-28 rounded-xl" />
             </div>
           </div>
 
@@ -281,6 +288,7 @@ export default function SettingsProfilePage() {
               onChange={onCoverChange}
               className="hidden"
             />
+            <p className="mt-1.5 text-xs text-muted-foreground">Máximo {UPLOAD_LIMITS_MB.profileCover}MB</p>
           </div>
 
           {/* Avatar */}
@@ -294,6 +302,7 @@ export default function SettingsProfilePage() {
               <Button type="button" variant="outline" size="sm" onClick={() => avatarInputRef.current?.click()}>
                 Alterar foto
               </Button>
+              <p className="mt-1.5 text-xs text-muted-foreground">Máximo {UPLOAD_LIMITS_MB.avatar}MB</p>
             </div>
             <input
               type="file"
@@ -333,6 +342,26 @@ export default function SettingsProfilePage() {
               value={form.bio}
               onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
             />
+          </div>
+
+          {/* Localização + Categoria */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-foreground mb-1.5">Localização</label>
+              <Input
+                value={form.location}
+                onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+                placeholder="São Paulo, Brasil"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-foreground mb-1.5">Categoria</label>
+              <Input
+                value={form.category}
+                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                placeholder="Design gráfico"
+              />
+            </div>
           </div>
 
           {/* Link + Contato */}

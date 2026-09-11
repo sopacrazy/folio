@@ -79,7 +79,7 @@ export default function DiscoverPage() {
               >
                 {cat}
                 {activeCategory === cat && (
-                  <span className="absolute left-0 right-0 -bottom-px h-0.5 rounded-full bg-primary" />
+                  <span className="absolute left-0 right-0 -bottom-px h-0.5 rounded-xl bg-primary" />
                 )}
               </button>
             ))}

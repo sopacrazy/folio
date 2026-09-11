@@ -17,6 +17,7 @@ import {
   MoreHorizontal,
   Plus,
   UserPlus,
+  X,
 } from 'lucide-react';
 import { getUserByUsername } from '../mockData';
 import { useAuthStore } from '../store/auth';
@@ -25,6 +26,84 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+interface FollowListUser {
+  id: string;
+  username: string;
+  fullName: string;
+  avatarUrl?: string;
+  bio?: string;
+}
+
+/** Modal simples de "quem segue / é seguido" — reaproveitado pros dois casos,
+    já que só muda o endpoint e o título. */
+function FollowListModal({
+  open,
+  title,
+  onClose,
+  users,
+  loading,
+  emptyLabel,
+}: {
+  open: boolean;
+  title: string;
+  onClose: () => void;
+  users: FollowListUser[];
+  loading: boolean;
+  emptyLabel: string;
+}) {
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 px-4 py-8"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md max-h-[80vh] overflow-y-auto rounded-2xl bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-border bg-white px-5 py-4">
+          <h2 className="text-lg font-bold text-foreground">{title}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            aria-label="Fechar"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="divide-y divide-border">
+          {loading ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">Carregando...</div>
+          ) : users.length === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">{emptyLabel}</div>
+          ) : (
+            users.map((u) => (
+              <Link
+                key={u.id}
+                to={`/${u.username}`}
+                onClick={onClose}
+                className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-muted"
+              >
+                <Avatar className="h-10 w-10 shrink-0">
+                  <AvatarImage src={u.avatarUrl} alt={u.fullName} />
+                  <AvatarFallback>{u.fullName?.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-foreground">{u.fullName}</span>
+                  <span className="block truncate text-xs text-muted-foreground">@{u.username}</span>
+                </span>
+              </Link>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ProfileProjectCard({ project }: { project: any }) {
   return (
@@ -155,6 +234,25 @@ export default function ProfilePage() {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followLoading, setFollowLoading] = useState(false);
+
+  const [followListOpen, setFollowListOpen] = useState<'followers' | 'following' | null>(null);
+  const [followListUsers, setFollowListUsers] = useState<FollowListUser[]>([]);
+  const [followListLoading, setFollowListLoading] = useState(false);
+
+  const openFollowList = async (kind: 'followers' | 'following') => {
+    if (user?.source !== 'real' || !username) return;
+    setFollowListOpen(kind);
+    setFollowListLoading(true);
+    try {
+      const res = await fetch(`/api/users/${encodeURIComponent(username)}/${kind}`);
+      const data = await res.json();
+      setFollowListUsers(res.ok ? data.users ?? [] : []);
+    } catch {
+      setFollowListUsers([]);
+    } finally {
+      setFollowListLoading(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -314,7 +412,7 @@ export default function ProfilePage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl font-bold text-foreground md:text-3xl">{user.fullName}</h1>
                   {user.category && (
-                    <span className="rounded-full bg-tag px-2.5 py-1 text-[11px] font-semibold text-tag-foreground">
+                    <span className="rounded-xl bg-tag px-2.5 py-1 text-[11px] font-semibold text-tag-foreground">
                       {user.category}
                     </span>
                   )}
@@ -346,6 +444,13 @@ export default function ProfilePage() {
                   >
                     <UserPlus className="h-4 w-4" /> {isFollowing ? 'Seguindo' : 'Seguir'}
                   </Button>
+                  {user.source === 'real' && (
+                    <Button variant="outline" asChild>
+                      <Link to={`/mensagens?with=${encodeURIComponent(user.username)}`}>
+                        <MessageCircle className="h-4 w-4" /> Mensagem
+                      </Link>
+                    </Button>
+                  )}
                   <Button variant="outline" size="icon" aria-label="Mais opções">
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
@@ -357,12 +462,28 @@ export default function ProfilePage() {
 
         <section className="mt-7 border-y border-border py-5">
           <div className="grid grid-cols-2 gap-4 sm:flex sm:flex-wrap sm:items-center sm:gap-10">
-            {stats.map((stat) => (
-              <div key={stat.label}>
-                <span className="text-xl font-bold text-foreground">{compactNumber(stat.value)}</span>
-                <span className="ml-1 text-sm font-medium text-muted-foreground">{stat.label}</span>
-              </div>
-            ))}
+            {stats.map((stat) => {
+              const kind = stat.label === 'seguidores' ? 'followers' : stat.label === 'seguindo' ? 'following' : null;
+              const content = (
+                <>
+                  <span className="text-xl font-bold text-foreground">{compactNumber(stat.value)}</span>
+                  <span className="ml-1 text-sm font-medium text-muted-foreground">{stat.label}</span>
+                </>
+              );
+              if (kind && user.source === 'real') {
+                return (
+                  <button
+                    key={stat.label}
+                    type="button"
+                    onClick={() => openFollowList(kind)}
+                    className="text-left transition-opacity hover:opacity-70"
+                  >
+                    {content}
+                  </button>
+                );
+              }
+              return <div key={stat.label}>{content}</div>;
+            })}
           </div>
         </section>
 
@@ -419,6 +540,15 @@ export default function ProfilePage() {
           </main>
         </div>
       </div>
+
+      <FollowListModal
+        open={followListOpen !== null}
+        title={followListOpen === 'followers' ? 'Seguidores' : 'Seguindo'}
+        onClose={() => setFollowListOpen(null)}
+        users={followListUsers}
+        loading={followListLoading}
+        emptyLabel={followListOpen === 'followers' ? 'Ainda não há seguidores.' : 'Ainda não segue ninguém.'}
+      />
     </div>
   );
 }
